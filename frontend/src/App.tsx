@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect } from 'react';
 import { AuditTimeline } from './components/AuditTimeline';
+import { ChangeBoard } from './components/ChangeBoard';
 import { useUser } from './context/UserContext';
 
 interface ServiceCatalog {
@@ -75,6 +76,7 @@ function App() {
   const [description, setDescription] = useState('');
   const [serviceCatalogId, setServiceCatalogId] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'incidents' | 'changes'>('incidents');
 
   const fetchApplications = async () => {
     const res = await fetch(API);
@@ -162,7 +164,34 @@ function App() {
           </div>
         </div>
 
-        <form
+        <div className="flex justify-center mb-8">
+          <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden">
+            <button
+              onClick={() => setTab('incidents')}
+              className={`px-5 py-2 text-sm font-medium transition-colors ${
+                tab === 'incidents'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              📋 Заявки
+            </button>
+            <button
+              onClick={() => setTab('changes')}
+              className={`px-5 py-2 text-sm font-medium transition-colors ${
+                tab === 'changes'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              🔄 Зміни
+            </button>
+          </div>
+        </div>
+
+        {tab === 'incidents' ? (
+          <>
+            <form
           onSubmit={handleSubmit}
           className="bg-white rounded-lg shadow p-6 mb-8 space-y-4"
         >
@@ -400,6 +429,10 @@ function App() {
             </tbody>
           </table>
         </div>
+          </>
+        ) : (
+          <ChangeBoard />
+        )}
       </div>
     </div>
   );

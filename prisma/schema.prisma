@@ -18,6 +18,8 @@ model Application {
   slaDeadline      DateTime?
   serviceCatalogId String?
   service          ServiceCatalog? @relation(fields: [serviceCatalogId], references: [id])
+  changeRequestId  String?
+  changeRequest    ChangeRequest?  @relation(fields: [changeRequestId], references: [id])
   createdAt        DateTime        @default(now())
   auditLogs        AuditLog[]
 }
@@ -41,5 +43,19 @@ model ServiceCatalog {
   name         String        @unique
   category     String        @default("End-user Support")
   description  String?
+  applications Application[]
+}
+
+model ChangeRequest {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  type        String   @default("NORMAL") // STANDARD, NORMAL, EMERGENCY
+  risk        String   @default("MEDIUM") // LOW, MEDIUM, HIGH
+  status      String   @default("DRAFT") // DRAFT, PENDING, APPROVED, IMPLEMENTED, REJECTED
+  scheduledAt DateTime
+  requestedBy String
+  approvedBy  String?
+  createdAt   DateTime @default(now())
   applications Application[]
 }
