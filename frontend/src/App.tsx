@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
+import { AuditTimeline } from './components/AuditTimeline';
 
 interface ServiceCatalog {
   id: string;
@@ -58,6 +59,7 @@ function App() {
   const [priority, setPriority] = useState('LOW');
   const [description, setDescription] = useState('');
   const [serviceCatalogId, setServiceCatalogId] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchApplications = async () => {
     const res = await fetch(API);
@@ -237,53 +239,71 @@ function App() {
                   new Date(app.slaDeadline) < new Date() &&
                   !['RESOLVED', 'CLOSED'].includes(app.status);
 
+                const isExpanded = expandedId === app.id;
+
                 return (
-                  <tr key={app.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {app.applicantName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {app.service?.name || (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {app.type === 'INCIDENT' ? '🔴' : '🔧'}{' '}
-                      {TYPE_LABELS[app.type] || app.type}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          PRIORITY_COLORS[app.priority] || 'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        {PRIORITY_LABELS[app.priority] || app.priority}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                        {STATUS_LABELS[app.status] || app.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {app.slaDeadline ? (
+                  <Fragment key={app.id}>
+                    <tr
+                      className={`cursor-pointer hover:bg-gray-50 transition-colors ${
+                        isExpanded ? 'bg-blue-50' : ''
+                      }`}
+                      onClick={() =>
+                        setExpandedId(isExpanded ? null : app.id)
+                      }
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {app.applicantName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {app.service?.name || (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {app.type === 'INCIDENT' ? '🔴' : '🔧'}{' '}
+                        {TYPE_LABELS[app.type] || app.type}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={
-                            isBreached
-                              ? 'text-red-600 font-bold'
-                              : 'text-gray-500'
-                          }
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            PRIORITY_COLORS[app.priority] || 'bg-gray-100 text-gray-700'
+                          }`}
                         >
-                          {new Date(app.slaDeadline).toLocaleString()}
+                          {PRIORITY_LABELS[app.priority] || app.priority}
                         </span>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(app.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                          {STATUS_LABELS[app.status] || app.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {app.slaDeadline ? (
+                          <span
+                            className={
+                              isBreached
+                                ? 'text-red-600 font-bold'
+                                : 'text-gray-500'
+                            }
+                          >
+                            {new Date(app.slaDeadline).toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(app.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr>
+                        <td colSpan={7} className="px-6 bg-gray-50 border-b">
+                          <AuditTimeline appId={app.id} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
               {applications.length === 0 && (

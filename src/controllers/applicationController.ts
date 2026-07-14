@@ -26,6 +26,21 @@ export const getApplications = async (_req: Request, res: Response): Promise<voi
   res.status(200).json(applications);
 };
 
+export const getApplicationLogs = async (req: Request, res: Response): Promise<void> => {
+  const id = req.params.id as string;
+
+  try {
+    const logs = await prisma.auditLog.findMany({
+      where: { applicationId: id },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.status(200).json(logs);
+  } catch (error) {
+    console.error('Failed to fetch audit logs:', error);
+    res.status(500).json({ error: 'Failed to fetch audit logs' });
+  }
+};
+
 export const updateApplicationStatus = async (req: Request, res: Response): Promise<void> => {
   const id = req.params.id as string;
   const { status, changedBy } = req.body;
