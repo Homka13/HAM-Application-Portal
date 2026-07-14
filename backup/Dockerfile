@@ -1,6 +1,6 @@
 FROM alpine:3.18
 
-RUN apk add --no-cache dcron
+RUN apk add --no-cache dcron curl rclone
 
 WORKDIR /app
 COPY backup.sh .

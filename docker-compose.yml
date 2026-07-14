@@ -16,9 +16,31 @@ services:
     build:
       context: ./backup
       dockerfile: Dockerfile
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - RCLONE_REMOTE=${RCLONE_REMOTE:-}
     volumes:
       - ./prisma:/db
       - ./backups:/backups
+    networks:
+      - itsm-network
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - itsm-network
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - '3001:3000'
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
     networks:
       - itsm-network
 
