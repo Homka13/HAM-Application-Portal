@@ -10,6 +10,7 @@ import serviceCatalogRoutes from './routes/serviceCatalogRoutes';
 import changeRoutes from './routes/changeRoutes';
 import problemRoutes from './routes/problemRoutes';
 import knowledgeRoutes from './routes/knowledgeRoutes';
+import reportRoutes from './routes/reportRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -56,6 +57,7 @@ app.use('/api/services', serviceCatalogRoutes);
 app.use('/api/changes', changeRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/api/kb', knowledgeRoutes);
+app.use('/api/reports', reportRoutes);
 
 async function refreshTicketGauge() {
   try {

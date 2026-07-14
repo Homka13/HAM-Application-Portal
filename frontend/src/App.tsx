@@ -3,6 +3,7 @@ import { AuditTimeline } from './components/AuditTimeline';
 import { ChangeBoard } from './components/ChangeBoard';
 import { ProblemBoard } from './components/ProblemBoard';
 import { KnowledgeBoard } from './components/KnowledgeBoard';
+import { Dashboard } from './components/Dashboard';
 import { useUser } from './context/UserContext';
 
 interface ServiceCatalog {
@@ -78,7 +79,7 @@ function App() {
   const [description, setDescription] = useState('');
   const [serviceCatalogId, setServiceCatalogId] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'incidents' | 'changes' | 'problems' | 'kb'>('incidents');
+  const [tab, setTab] = useState<'incidents' | 'changes' | 'problems' | 'kb' | 'dashboard'>('incidents');
   const [suggestions, setSuggestions] = useState<{ id: string; title: string; category: string }[]>([]);
 
   useEffect(() => {
@@ -225,6 +226,16 @@ function App() {
               }`}
             >
               📚 База знань
+            </button>
+            <button
+              onClick={() => setTab('dashboard')}
+              className={`px-5 py-2 text-sm font-medium transition-colors ${
+                tab === 'dashboard'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              📊 Дашборд
             </button>
           </div>
         </div>
@@ -492,8 +503,10 @@ function App() {
           <ChangeBoard />
         ) : tab === 'problems' ? (
           <ProblemBoard />
-        ) : (
+        ) : tab === 'kb' ? (
           <KnowledgeBoard />
+        ) : (
+          <Dashboard />
         )}
       </div>
     </div>
