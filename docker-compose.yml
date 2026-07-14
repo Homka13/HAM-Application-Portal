@@ -6,9 +6,9 @@ services:
     ports:
       - '3000:3000'
     environment:
-      - DATABASE_URL=file:./dev.db
+      - DATABASE_URL=file:/app/prisma/dev.db
     volumes:
-      - db-data:/app/prisma
+      - ./prisma:/app/prisma
     networks:
       - itsm-network
 
@@ -22,9 +22,6 @@ services:
       - backend
     networks:
       - itsm-network
-
-volumes:
-  db-data:
 
 networks:
   itsm-network:
