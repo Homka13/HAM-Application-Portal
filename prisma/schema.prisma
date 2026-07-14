@@ -8,13 +8,27 @@ datasource db {
 }
 
 model Application {
-  id            String   @id @default(uuid())
+  id            String     @id @default(uuid())
   applicantName String
-  type          String   @default("SERVICE_REQUEST")
-  priority      String   @default("LOW")
-  status        String   @default("NEW")
+  type          String     @default("SERVICE_REQUEST")
+  priority      String     @default("LOW")
+  status        String     @default("NEW")
   description   String?
   assignee      String?
   slaDeadline   DateTime?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime   @default(now())
+  auditLogs     AuditLog[]
+}
+
+
+model AuditLog {
+  id            String      @id @default(uuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  field         String
+  oldValue      String?
+  newValue      String?
+  changedBy     String
+  createdAt     DateTime    @default(now())
 }
