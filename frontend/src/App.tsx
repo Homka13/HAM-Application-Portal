@@ -1,6 +1,7 @@
 import { Fragment, useState, useEffect } from 'react';
 import { AuditTimeline } from './components/AuditTimeline';
 import { ChangeBoard } from './components/ChangeBoard';
+import { ProblemBoard } from './components/ProblemBoard';
 import { useUser } from './context/UserContext';
 
 interface ServiceCatalog {
@@ -76,7 +77,7 @@ function App() {
   const [description, setDescription] = useState('');
   const [serviceCatalogId, setServiceCatalogId] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'incidents' | 'changes'>('incidents');
+  const [tab, setTab] = useState<'incidents' | 'changes' | 'problems'>('incidents');
 
   const fetchApplications = async () => {
     const res = await fetch(API);
@@ -185,6 +186,16 @@ function App() {
               }`}
             >
               🔄 Зміни
+            </button>
+            <button
+              onClick={() => setTab('problems')}
+              className={`px-5 py-2 text-sm font-medium transition-colors ${
+                tab === 'problems'
+                  ? 'bg-orange-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              🔍 Проблеми
             </button>
           </div>
         </div>
@@ -430,8 +441,10 @@ function App() {
           </table>
         </div>
           </>
-        ) : (
+        ) : tab === 'changes' ? (
           <ChangeBoard />
+        ) : (
+          <ProblemBoard />
         )}
       </div>
     </div>

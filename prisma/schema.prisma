@@ -20,6 +20,8 @@ model Application {
   service          ServiceCatalog? @relation(fields: [serviceCatalogId], references: [id])
   changeRequestId  String?
   changeRequest    ChangeRequest?  @relation(fields: [changeRequestId], references: [id])
+  problemId        String?
+  problem          Problem?        @relation(fields: [problemId], references: [id])
   createdAt        DateTime        @default(now())
   auditLogs        AuditLog[]
 }
@@ -57,5 +59,16 @@ model ChangeRequest {
   requestedBy String
   approvedBy  String?
   createdAt   DateTime @default(now())
+  applications Application[]
+}
+
+model Problem {
+  id          String        @id @default(uuid())
+  title       String
+  description String
+  status      String        @default("NEW") // NEW, RCA, KNOWN_ERROR, RESOLVED
+  rootCause   String?
+  workaround  String?
+  createdAt   DateTime      @default(now())
   applications Application[]
 }

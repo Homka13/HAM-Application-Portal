@@ -116,3 +116,19 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
     res.status(500).json({ error: 'Failed to update application status' });
   }
 };
+
+export const linkProblemToApplication = async (req: Request, res: Response): Promise<void> => {
+  const id = req.params.id as string;
+  const { problemId } = req.body;
+
+  try {
+    const updated = await prisma.application.update({
+      where: { id },
+      data: { problemId },
+    });
+    res.status(200).json(updated);
+  } catch (error) {
+    console.error('Failed to link problem:', error);
+    res.status(500).json({ error: 'Failed to link problem to application' });
+  }
+};
