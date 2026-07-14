@@ -2,6 +2,7 @@ import { Fragment, useState, useEffect } from 'react';
 import { AuditTimeline } from './components/AuditTimeline';
 import { ChangeBoard } from './components/ChangeBoard';
 import { ProblemBoard } from './components/ProblemBoard';
+import { KnowledgeBoard } from './components/KnowledgeBoard';
 import { useUser } from './context/UserContext';
 
 interface ServiceCatalog {
@@ -77,7 +78,25 @@ function App() {
   const [description, setDescription] = useState('');
   const [serviceCatalogId, setServiceCatalogId] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'incidents' | 'changes' | 'problems'>('incidents');
+  const [tab, setTab] = useState<'incidents' | 'changes' | 'problems' | 'kb'>('incidents');
+  const [suggestions, setSuggestions] = useState<{ id: string; title: string; category: string }[]>([]);
+
+  useEffect(() => {
+    if (tab !== 'incidents') return;
+    const timer = setTimeout(async () => {
+      if (description.length < 3) {
+        setSuggestions([]);
+        return;
+      }
+      try {
+        const res = await fetch(`http://localhost:3000/api/kb/search?q=${encodeURIComponent(description)}`);
+        setSuggestions(await res.json());
+      } catch {
+        setSuggestions([]);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [description, tab]);
 
   const fetchApplications = async () => {
     const res = await fetch(API);
@@ -197,6 +216,16 @@ function App() {
             >
               🔍 Проблеми
             </button>
+            <button
+              onClick={() => setTab('kb')}
+              className={`px-5 py-2 text-sm font-medium transition-colors ${
+                tab === 'kb'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              📚 База знань
+            </button>
           </div>
         </div>
 
@@ -294,6 +323,24 @@ function App() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
           </div>
+
+          {suggestions.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-xs font-medium text-blue-800 mb-2">
+                💡 Можливо, це вам допоможе:
+              </p>
+              <ul className="space-y-1">
+                {suggestions.map((s) => (
+                  <li key={s.id}>
+                    <span className="text-sm text-blue-700 cursor-pointer hover:underline">
+                      📄 {s.title}
+                    </span>
+                    <span className="text-xs text-blue-400 ml-2">({s.category})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <button
             type="submit"
@@ -443,8 +490,10 @@ function App() {
           </>
         ) : tab === 'changes' ? (
           <ChangeBoard />
-        ) : (
+        ) : tab === 'problems' ? (
           <ProblemBoard />
+        ) : (
+          <KnowledgeBoard />
         )}
       </div>
     </div>

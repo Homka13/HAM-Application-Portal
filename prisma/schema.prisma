@@ -71,4 +71,19 @@ model Problem {
   workaround  String?
   createdAt   DateTime      @default(now())
   applications Application[]
+  knowledgeArticle KnowledgeArticle?
+}
+
+model KnowledgeArticle {
+  id        String   @id @default(uuid())
+  title     String
+  content   String   // Markdown
+  category  String   @default("General")
+  status    String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+
+  problemId String?  @unique
+  problem   Problem? @relation(fields: [problemId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
