@@ -1,0 +1,15 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Application {
+  id            String   @id @default(uuid())
+  applicantName String
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now())
+}
