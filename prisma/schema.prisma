@@ -10,6 +10,10 @@ datasource db {
 model Application {
   id            String   @id @default(uuid())
   applicantName String
-  status        String   @default("PENDING")
+  type          String   @default("SERVICE_REQUEST")
+  priority      String   @default("LOW")
+  status        String   @default("NEW")
+  description   String?
+  assignee      String?
   createdAt     DateTime @default(now())
 }
