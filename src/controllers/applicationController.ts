@@ -1,6 +1,7 @@
-const prisma = require('../config/db');
+import { Request, Response } from 'express';
+import prisma from '../config/db';
 
-const createApplication = async (req, res) => {
+export const createApplication = async (req: Request, res: Response): Promise<void> => {
   const { applicantName } = req.body;
   const application = await prisma.application.create({
     data: { applicantName },
@@ -8,11 +9,9 @@ const createApplication = async (req, res) => {
   res.status(201).json(application);
 };
 
-const getApplications = async (req, res) => {
+export const getApplications = async (_req: Request, res: Response): Promise<void> => {
   const applications = await prisma.application.findMany({
     orderBy: { createdAt: 'desc' },
   });
   res.status(200).json(applications);
 };
-
-module.exports = { createApplication, getApplications };
