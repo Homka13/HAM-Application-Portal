@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
 
+interface ServiceCatalog {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
 interface Application {
   id: string;
   applicantName: string;
@@ -9,10 +15,13 @@ interface Application {
   description: string | null;
   assignee: string | null;
   slaDeadline?: string;
+  serviceCatalogId?: string;
+  service?: ServiceCatalog;
   createdAt: string;
 }
 
 const API = 'http://localhost:3000/api/applications';
+const SERVICES_API = 'http://localhost:3000/api/services';
 
 const PRIORITY_COLORS: Record<string, string> = {
   LOW: 'bg-gray-100 text-gray-700',
@@ -23,10 +32,12 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 function App() {
   const [applications, setApplications] = useState<Application[]>([]);
+  const [services, setServices] = useState<ServiceCatalog[]>([]);
   const [applicantName, setApplicantName] = useState('');
   const [type, setType] = useState('SERVICE_REQUEST');
   const [priority, setPriority] = useState('LOW');
   const [description, setDescription] = useState('');
+  const [serviceCatalogId, setServiceCatalogId] = useState('');
 
   const fetchApplications = async () => {
     const res = await fetch(API);
@@ -34,8 +45,15 @@ function App() {
     setApplications(data);
   };
 
+  const fetchServices = async () => {
+    const res = await fetch(SERVICES_API);
+    const data = await res.json();
+    setServices(data);
+  };
+
   useEffect(() => {
     fetchApplications();
+    fetchServices();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,10 +61,17 @@ function App() {
     await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ applicantName, type, priority, description }),
+      body: JSON.stringify({
+        applicantName,
+        type,
+        priority,
+        description,
+        serviceCatalogId: serviceCatalogId || undefined,
+      }),
     });
     setApplicantName('');
     setDescription('');
+    setServiceCatalogId('');
     fetchApplications();
   };
 
@@ -108,6 +133,24 @@ function App() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              Service
+            </label>
+            <select
+              value={serviceCatalogId}
+              onChange={(e) => setServiceCatalogId(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">— Select a service —</option>
+              {services.map((svc) => (
+                <option key={svc.id} value={svc.id}>
+                  {svc.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Description
             </label>
             <textarea
@@ -133,6 +176,9 @@ function App() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Service
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Type
@@ -162,6 +208,11 @@ function App() {
                   <tr key={app.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {app.applicantName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {app.service?.name || (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {app.type === 'INCIDENT' ? '🔴' : '🔧'}{' '}
@@ -204,7 +255,7 @@ function App() {
               })}
               {applications.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
                     No applications yet.
                   </td>
                 </tr>

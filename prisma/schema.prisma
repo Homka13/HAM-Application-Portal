@@ -8,16 +8,18 @@ datasource db {
 }
 
 model Application {
-  id            String     @id @default(uuid())
-  applicantName String
-  type          String     @default("SERVICE_REQUEST")
-  priority      String     @default("LOW")
-  status        String     @default("NEW")
-  description   String?
-  assignee      String?
-  slaDeadline   DateTime?
-  createdAt     DateTime   @default(now())
-  auditLogs     AuditLog[]
+  id               String          @id @default(uuid())
+  applicantName    String
+  type             String          @default("SERVICE_REQUEST")
+  priority         String          @default("LOW")
+  status           String          @default("NEW")
+  description      String?
+  assignee         String?
+  slaDeadline      DateTime?
+  serviceCatalogId String?
+  service          ServiceCatalog? @relation(fields: [serviceCatalogId], references: [id])
+  createdAt        DateTime        @default(now())
+  auditLogs        AuditLog[]
 }
 
 
@@ -31,4 +33,12 @@ model AuditLog {
   newValue      String?
   changedBy     String
   createdAt     DateTime    @default(now())
+}
+
+
+model ServiceCatalog {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  description  String?
+  applications Application[]
 }
