@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    environment:
+      - DATABASE_URL=file:./dev.db
+    volumes:
+      - db-data:/app/prisma
+    networks:
+      - itsm-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - '80:80'
+    depends_on:
+      - backend
+    networks:
+      - itsm-network
+
+volumes:
+  db-data:
+
+networks:
+  itsm-network:
+    driver: bridge
