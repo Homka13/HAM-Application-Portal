@@ -15,5 +15,6 @@ model Application {
   status        String   @default("NEW")
   description   String?
   assignee      String?
+  slaDeadline   DateTime?
   createdAt     DateTime @default(now())
 }

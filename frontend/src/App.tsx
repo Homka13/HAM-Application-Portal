@@ -8,6 +8,7 @@ interface Application {
   status: string;
   description: string | null;
   assignee: string | null;
+  slaDeadline?: string;
   createdAt: string;
 }
 
@@ -143,42 +144,67 @@ function App() {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Deadline
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {applications.map((app) => (
-                <tr key={app.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {app.applicantName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {app.type === 'INCIDENT' ? '🔴' : '🔧'}{' '}
-                    {app.type.replace('_', ' ')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        PRIORITY_COLORS[app.priority] || 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {app.priority}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                      {app.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(app.createdAt).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
+              {applications.map((app) => {
+                const isBreached =
+                  app.slaDeadline &&
+                  new Date(app.slaDeadline) < new Date() &&
+                  !['RESOLVED', 'CLOSED'].includes(app.status);
+
+                return (
+                  <tr key={app.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {app.applicantName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {app.type === 'INCIDENT' ? '🔴' : '🔧'}{' '}
+                      {app.type.replace('_', ' ')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          PRIORITY_COLORS[app.priority] || 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {app.priority}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                        {app.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {app.slaDeadline ? (
+                        <span
+                          className={
+                            isBreached
+                              ? 'text-red-600 font-bold'
+                              : 'text-gray-500'
+                          }
+                        >
+                          {new Date(app.slaDeadline).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(app.createdAt).toLocaleDateString()}
+                    </td>
+                  </tr>
+                );
+              })}
               {applications.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">
                     No applications yet.
                   </td>
                 </tr>
