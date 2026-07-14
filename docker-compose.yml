@@ -12,6 +12,16 @@ services:
     networks:
       - itsm-network
 
+  backup:
+    build:
+      context: ./backup
+      dockerfile: Dockerfile
+    volumes:
+      - ./prisma:/db
+      - ./backups:/backups
+    networks:
+      - itsm-network
+
   frontend:
     build:
       context: ./frontend
