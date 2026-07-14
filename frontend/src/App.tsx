@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 interface ServiceCatalog {
   id: string;
   name: string;
+  category: string;
   description: string | null;
 }
 
@@ -160,11 +161,24 @@ function App() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">— Оберіть сервіс —</option>
-              {services.map((svc) => (
-                <option key={svc.id} value={svc.id}>
-                  {svc.name}
-                </option>
-              ))}
+              {(() => {
+                const grouped = services.reduce<Record<string, ServiceCatalog[]>>(
+                  (acc, svc) => {
+                    (acc[svc.category] ||= []).push(svc);
+                    return acc;
+                  },
+                  {}
+                );
+                return Object.entries(grouped).map(([cat, svcs]) => (
+                  <optgroup key={cat} label={cat}>
+                    {svcs.map((svc) => (
+                      <option key={svc.id} value={svc.id}>
+                        {svc.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ));
+              })()}
             </select>
           </div>
 

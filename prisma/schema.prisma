@@ -39,6 +39,7 @@ model AuditLog {
 model ServiceCatalog {
   id           String        @id @default(uuid())
   name         String        @unique
+  category     String        @default("End-user Support")
   description  String?
   applications Application[]
 }
