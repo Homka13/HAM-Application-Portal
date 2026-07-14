@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect } from 'react';
 import { AuditTimeline } from './components/AuditTimeline';
+import { useUser } from './context/UserContext';
 
 interface ServiceCatalog {
   id: string;
@@ -51,7 +52,21 @@ const STATUS_LABELS: Record<string, string> = {
   CLOSED: 'Закрито',
 };
 
+const NEXT_STATUS: Record<string, string[]> = {
+  NEW: ['IN_PROGRESS', 'CLOSED'],
+  IN_PROGRESS: ['RESOLVED', 'CLOSED'],
+  RESOLVED: ['CLOSED', 'IN_PROGRESS'],
+  CLOSED: [],
+};
+
+const STATUS_ACTION_LABELS: Record<string, string> = {
+  IN_PROGRESS: 'В роботу',
+  RESOLVED: 'Вирішити',
+  CLOSED: 'Закрити',
+};
+
 function App() {
+  const { role, setRole } = useUser();
   const [applications, setApplications] = useState<Application[]>([]);
   const [services, setServices] = useState<ServiceCatalog[]>([]);
   const [applicantName, setApplicantName] = useState('');
@@ -97,12 +112,55 @@ function App() {
     fetchApplications();
   };
 
+  const handleStatusChange = async (appId: string, newStatus: string) => {
+    await fetch(`${API}/${appId}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-role': role,
+      },
+      body: JSON.stringify({
+        status: newStatus,
+        changedBy: `${role}@ham.local`,
+        ...(newStatus === 'RESOLVED'
+          ? { resolutionNote: 'Вирішено адміністратором' }
+          : {}),
+      }),
+    });
+    fetchApplications();
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-4">
           Портал заявок HAM
         </h1>
+
+        <div className="flex justify-center mb-8">
+          <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden">
+            <button
+              onClick={() => setRole('USER')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                role === 'USER'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              👤 Користувач
+            </button>
+            <button
+              onClick={() => setRole('ADMIN')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                role === 'ADMIN'
+                  ? 'bg-red-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              🛡️ Адміністратор
+            </button>
+          </div>
+        </div>
 
         <form
           onSubmit={handleSubmit}
@@ -299,6 +357,32 @@ function App() {
                     {isExpanded && (
                       <tr>
                         <td colSpan={7} className="px-6 bg-gray-50 border-b">
+                          {role === 'ADMIN' &&
+                            NEXT_STATUS[app.status]?.length > 0 && (
+                              <div className="flex items-center gap-2 py-3 border-b border-gray-200">
+                                <span className="text-xs text-gray-500 mr-2">
+                                  Дії:
+                                </span>
+                                {NEXT_STATUS[app.status].map((next) => (
+                                  <button
+                                    key={next}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStatusChange(app.id, next);
+                                    }}
+                                    className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                                      next === 'CLOSED'
+                                        ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                        : next === 'IN_PROGRESS'
+                                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                        : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    }`}
+                                  >
+                                    {STATUS_ACTION_LABELS[next] || next}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           <AuditTimeline appId={app.id} />
                         </td>
                       </tr>
