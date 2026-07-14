@@ -30,6 +30,25 @@ const PRIORITY_COLORS: Record<string, string> = {
   CRITICAL: 'bg-red-100 text-red-800',
 };
 
+const PRIORITY_LABELS: Record<string, string> = {
+  LOW: 'Низький',
+  MEDIUM: 'Середній',
+  HIGH: 'Високий',
+  CRITICAL: 'Критичний',
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  SERVICE_REQUEST: 'Запит',
+  INCIDENT: 'Інцидент',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  NEW: 'Новий',
+  IN_PROGRESS: 'В роботі',
+  RESOLVED: 'Вирішено',
+  CLOSED: 'Закрито',
+};
+
 function App() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [services, setServices] = useState<ServiceCatalog[]>([]);
@@ -79,7 +98,7 @@ function App() {
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">
-          HAM Application Portal
+          Портал заявок HAM
         </h1>
 
         <form
@@ -88,13 +107,13 @@ function App() {
         >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Applicant Name
+              Ім'я заявника
             </label>
             <input
               type="text"
               value={applicantName}
               onChange={(e) => setApplicantName(e.target.value)}
-              placeholder="Enter applicant name"
+              placeholder="Введіть ім'я заявника"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
@@ -103,44 +122,44 @@ function App() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Type
+                Тип
               </label>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="SERVICE_REQUEST">Service Request</option>
-                <option value="INCIDENT">Incident</option>
+                <option value="SERVICE_REQUEST">Запит на обслуговування</option>
+                <option value="INCIDENT">Інцидент</option>
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Priority
+                Пріоритет
               </label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
-                <option value="CRITICAL">Critical</option>
+                <option value="LOW">Низький</option>
+                <option value="MEDIUM">Середній</option>
+                <option value="HIGH">Високий</option>
+                <option value="CRITICAL">Критичний</option>
               </select>
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Service
+              Сервіс
             </label>
             <select
               value={serviceCatalogId}
               onChange={(e) => setServiceCatalogId(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">— Select a service —</option>
+              <option value="">— Оберіть сервіс —</option>
               {services.map((svc) => (
                 <option key={svc.id} value={svc.id}>
                   {svc.name}
@@ -151,12 +170,12 @@ function App() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
+              Опис
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe the request or incident..."
+              placeholder="Опишіть запит або інцидент..."
               rows={3}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
@@ -166,7 +185,7 @@ function App() {
             type="submit"
             className="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            Submit
+            Створити
           </button>
         </form>
 
@@ -175,25 +194,25 @@ function App() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
+                  Ім'я
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Service
+                  Сервіс
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
+                  Тип
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Priority
+                  Пріоритет
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                  Статус
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Deadline
+                  Дедлайн
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
+                  Дата
                 </th>
               </tr>
             </thead>
@@ -216,7 +235,7 @@ function App() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {app.type === 'INCIDENT' ? '🔴' : '🔧'}{' '}
-                      {app.type.replace('_', ' ')}
+                      {TYPE_LABELS[app.type] || app.type}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -224,12 +243,12 @@ function App() {
                           PRIORITY_COLORS[app.priority] || 'bg-gray-100 text-gray-700'
                         }`}
                       >
-                        {app.priority}
+                        {PRIORITY_LABELS[app.priority] || app.priority}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                        {app.status}
+                        {STATUS_LABELS[app.status] || app.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -256,7 +275,7 @@ function App() {
               {applications.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
-                    No applications yet.
+                    Заявок ще немає.
                   </td>
                 </tr>
               )}
