@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from 'react';
+import { Fragment, useState, useEffect, useMemo } from 'react';
 import { AuditTimeline } from './components/AuditTimeline';
 import { ChangeBoard } from './components/ChangeBoard';
 import { ProblemBoard } from './components/ProblemBoard';
@@ -81,6 +81,8 @@ function App() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tab, setTab] = useState<'incidents' | 'changes' | 'problems' | 'kb' | 'dashboard'>('incidents');
   const [suggestions, setSuggestions] = useState<{ id: string; title: string; category: string }[]>([]);
+  const [filter, setFilter] = useState<'ALL' | 'OVERDUE' | 'HIGH'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (tab !== 'incidents') return;
@@ -98,6 +100,27 @@ function App() {
     }, 500);
     return () => clearTimeout(timer);
   }, [description, tab]);
+
+  const filteredApplications = useMemo(() => {
+    let result = applications;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (app) =>
+          (app.applicantName || '').toLowerCase().includes(q) ||
+          (app.description || '').toLowerCase().includes(q),
+      );
+    }
+    if (filter === 'OVERDUE') {
+      const now = new Date();
+      result = result.filter(
+        (app) => app.slaDeadline && new Date(app.slaDeadline) < now && app.status !== 'RESOLVED' && app.status !== 'CLOSED',
+      );
+    } else if (filter === 'HIGH') {
+      result = result.filter((app) => app.priority === 'HIGH' || app.priority === 'CRITICAL');
+    }
+    return result;
+  }, [applications, filter, searchQuery]);
 
   const fetchApplications = async () => {
     const res = await fetch(API);
@@ -361,6 +384,25 @@ function App() {
           </button>
         </form>
 
+        <div className="flex gap-3 mb-4">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Пошук за ім'ям або описом..."
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as 'ALL' | 'OVERDUE' | 'HIGH')}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="ALL">Всі заявки</option>
+            <option value="OVERDUE">🔴 Прострочені</option>
+            <option value="HIGH">🔥 Високий пріоритет</option>
+          </select>
+        </div>
+
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50">
@@ -389,7 +431,7 @@ function App() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {applications.map((app) => {
+              {filteredApplications.map((app) => {
                 const isBreached =
                   app.slaDeadline &&
                   new Date(app.slaDeadline) < new Date() &&
@@ -492,6 +534,13 @@ function App() {
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
                     Заявок ще немає.
+                  </td>
+                </tr>
+              )}
+              {applications.length > 0 && filteredApplications.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
+                    Нічого не знайдено.
                   </td>
                 </tr>
               )}

@@ -11,6 +11,7 @@ import changeRoutes from './routes/changeRoutes';
 import problemRoutes from './routes/problemRoutes';
 import knowledgeRoutes from './routes/knowledgeRoutes';
 import reportRoutes from './routes/reportRoutes';
+import { initSlaEscalation } from './cronJobs';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -82,5 +83,6 @@ app.get('/metrics', async (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  initSlaEscalation();
 });
 
