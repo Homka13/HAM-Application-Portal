@@ -41,9 +41,23 @@ export const getApplicationLogs = async (req: Request, res: Response): Promise<v
   }
 };
 
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  NEW: ['IN_PROGRESS', 'CLOSED'],
+  IN_PROGRESS: ['RESOLVED', 'CLOSED'],
+  RESOLVED: ['CLOSED', 'IN_PROGRESS'],
+  CLOSED: [],
+};
+
+class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
 export const updateApplicationStatus = async (req: Request, res: Response): Promise<void> => {
   const id = req.params.id as string;
-  const { status, changedBy } = req.body;
+  const { status, changedBy, resolutionNote } = req.body;
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -55,6 +69,19 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
 
       if (currentApp.status === status) {
         return currentApp;
+      }
+
+      const allowedStatuses = VALID_TRANSITIONS[currentApp.status] || [];
+      if (!allowedStatuses.includes(status)) {
+        throw new ValidationError(
+          `Недопустимий перехід: ${currentApp.status} → ${status}`
+        );
+      }
+
+      if (status === 'RESOLVED' && !resolutionNote) {
+        throw new ValidationError(
+          'Для переведення в RESOLVED необхідно вказати опис рішення (resolutionNote)'
+        );
       }
 
       const updatedApp = await tx.application.update({
@@ -79,6 +106,10 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
   } catch (error: any) {
     if (error.message === 'Application not found') {
       res.status(404).json({ error: error.message });
+      return;
+    }
+    if (error instanceof ValidationError) {
+      res.status(400).json({ error: error.message });
       return;
     }
     console.error('Transaction failed:', error);
