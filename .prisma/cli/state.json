@@ -1,0 +1,25 @@
+{
+  "auth": null,
+  "project": {
+    "rememberedByWorkspace": {
+      "wksp_zvox11bzh0wycihgiop8gkuj": {
+        "id": "proj_ihv13m7mbcqqkgmboau4ea67",
+        "name": "ham-application-portal",
+        "workspaceId": "wksp_zvox11bzh0wycihgiop8gkuj"
+      }
+    },
+    "lastResolved": {
+      "id": "proj_ihv13m7mbcqqkgmboau4ea67",
+      "name": "ham-application-portal",
+      "workspaceId": "wksp_zvox11bzh0wycihgiop8gkuj"
+    },
+    "repositoryConnectionsByProject": {}
+  },
+  "branch": {
+    "active": "preview"
+  },
+  "app": {
+    "selectedByProject": {},
+    "knownLiveDeploymentByProject": {}
+  }
+}
