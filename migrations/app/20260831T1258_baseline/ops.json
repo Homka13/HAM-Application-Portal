@@ -1,0 +1,703 @@
+[
+  {
+    "id": "schema.public",
+    "label": "Create schema \"public\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"public\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"public\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "table.application",
+    "label": "Create table \"application\"",
+    "summary": "Creates table \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"application\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"application\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"application\"",
+        "sql": "CREATE TABLE \"public\".\"application\" (\n  \"applicantName\" text NOT NULL,\n  \"assignee\" text,\n  \"changeRequestId\" text,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text,\n  \"id\" text NOT NULL,\n  \"priority\" text DEFAULT 'LOW' NOT NULL,\n  \"problemId\" text,\n  \"serviceCatalogId\" text,\n  \"slaDeadline\" timestamptz,\n  \"status\" text DEFAULT 'NEW' NOT NULL,\n  \"type\" text DEFAULT 'SERVICE_REQUEST' NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"application\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"application\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.auditLog",
+    "label": "Create table \"auditLog\"",
+    "summary": "Creates table \"auditLog\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "auditLog"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"auditLog\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auditLog\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"auditLog\"",
+        "sql": "CREATE TABLE \"public\".\"auditLog\" (\n  \"applicationId\" text NOT NULL,\n  \"changedBy\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"field\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"newValue\" text,\n  \"oldValue\" text,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"auditLog\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auditLog\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.changeRequest",
+    "label": "Create table \"changeRequest\"",
+    "summary": "Creates table \"changeRequest\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "changeRequest"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"changeRequest\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"changeRequest\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"changeRequest\"",
+        "sql": "CREATE TABLE \"public\".\"changeRequest\" (\n  \"approvedBy\" text,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"requestedBy\" text NOT NULL,\n  \"risk\" text DEFAULT 'MEDIUM' NOT NULL,\n  \"scheduledAt\" timestamptz NOT NULL,\n  \"status\" text DEFAULT 'DRAFT' NOT NULL,\n  \"title\" text NOT NULL,\n  \"type\" text DEFAULT 'NORMAL' NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"changeRequest\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"changeRequest\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.knowledgeArticle",
+    "label": "Create table \"knowledgeArticle\"",
+    "summary": "Creates table \"knowledgeArticle\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "knowledgeArticle"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"knowledgeArticle\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"knowledgeArticle\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"knowledgeArticle\"",
+        "sql": "CREATE TABLE \"public\".\"knowledgeArticle\" (\n  \"category\" text DEFAULT 'General' NOT NULL,\n  \"content\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"problemId\" text,\n  \"status\" text DEFAULT 'DRAFT' NOT NULL,\n  \"title\" text NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"knowledgeArticle\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"knowledgeArticle\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.problem",
+    "label": "Create table \"problem\"",
+    "summary": "Creates table \"problem\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "problem"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"problem\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"problem\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"problem\"",
+        "sql": "CREATE TABLE \"public\".\"problem\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"rootCause\" text,\n  \"status\" text DEFAULT 'NEW' NOT NULL,\n  \"title\" text NOT NULL,\n  \"workaround\" text,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"problem\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"problem\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.serviceCatalog",
+    "label": "Create table \"serviceCatalog\"",
+    "summary": "Creates table \"serviceCatalog\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "serviceCatalog"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"serviceCatalog\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"serviceCatalog\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"serviceCatalog\"",
+        "sql": "CREATE TABLE \"public\".\"serviceCatalog\" (\n  \"category\" text DEFAULT 'End-user Support' NOT NULL,\n  \"description\" text,\n  \"id\" text NOT NULL,\n  \"name\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"serviceCatalog\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"serviceCatalog\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.knowledgeArticle.knowledgeArticle_problemId_key",
+    "label": "Add unique constraint on \"knowledgeArticle\" (problemId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "knowledgeArticle_problemId_key",
+        "table": "knowledgeArticle"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"knowledgeArticle_problemId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "knowledgeArticle_problemId_key",
+          "public",
+          "\"public\".\"knowledgeArticle\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"knowledgeArticle_problemId_key\"",
+        "sql": "ALTER TABLE \"public\".\"knowledgeArticle\" ADD CONSTRAINT \"knowledgeArticle_problemId_key\" UNIQUE (\"problemId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"knowledgeArticle_problemId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "knowledgeArticle_problemId_key",
+          "public",
+          "\"public\".\"knowledgeArticle\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.serviceCatalog.serviceCatalog_name_key",
+    "label": "Add unique constraint on \"serviceCatalog\" (name)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "serviceCatalog_name_key",
+        "table": "serviceCatalog"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"serviceCatalog_name_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "serviceCatalog_name_key",
+          "public",
+          "\"public\".\"serviceCatalog\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"serviceCatalog_name_key\"",
+        "sql": "ALTER TABLE \"public\".\"serviceCatalog\" ADD CONSTRAINT \"serviceCatalog_name_key\" UNIQUE (\"name\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"serviceCatalog_name_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "serviceCatalog_name_key",
+          "public",
+          "\"public\".\"serviceCatalog\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.application.application_changeRequestId_idx_14b0e07b",
+    "label": "Create index \"application_changeRequestId_idx_14b0e07b\" on \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "application_changeRequestId_idx_14b0e07b",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"application_changeRequestId_idx_14b0e07b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"application_changeRequestId_idx_14b0e07b\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"application_changeRequestId_idx_14b0e07b\"",
+        "sql": "CREATE INDEX \"application_changeRequestId_idx_14b0e07b\" ON \"public\".\"application\" (\"changeRequestId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"application_changeRequestId_idx_14b0e07b\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"application_changeRequestId_idx_14b0e07b\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.application.application_problemId_idx_0024556d",
+    "label": "Create index \"application_problemId_idx_0024556d\" on \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "application_problemId_idx_0024556d",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"application_problemId_idx_0024556d\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"application_problemId_idx_0024556d\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"application_problemId_idx_0024556d\"",
+        "sql": "CREATE INDEX \"application_problemId_idx_0024556d\" ON \"public\".\"application\" (\"problemId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"application_problemId_idx_0024556d\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"application_problemId_idx_0024556d\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.application.application_serviceCatalogId_idx_d1918080",
+    "label": "Create index \"application_serviceCatalogId_idx_d1918080\" on \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "application_serviceCatalogId_idx_d1918080",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"application_serviceCatalogId_idx_d1918080\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"application_serviceCatalogId_idx_d1918080\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"application_serviceCatalogId_idx_d1918080\"",
+        "sql": "CREATE INDEX \"application_serviceCatalogId_idx_d1918080\" ON \"public\".\"application\" (\"serviceCatalogId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"application_serviceCatalogId_idx_d1918080\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"application_serviceCatalogId_idx_d1918080\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.auditLog.auditLog_applicationId_idx_8158f91a",
+    "label": "Create index \"auditLog_applicationId_idx_8158f91a\" on \"auditLog\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "auditLog_applicationId_idx_8158f91a",
+        "table": "auditLog"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"auditLog_applicationId_idx_8158f91a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auditLog_applicationId_idx_8158f91a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"auditLog_applicationId_idx_8158f91a\"",
+        "sql": "CREATE INDEX \"auditLog_applicationId_idx_8158f91a\" ON \"public\".\"auditLog\" (\"applicationId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"auditLog_applicationId_idx_8158f91a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"auditLog_applicationId_idx_8158f91a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.application.application_serviceCatalogId_fkey",
+    "label": "Add foreign key \"application_serviceCatalogId_fkey\" on \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "application_serviceCatalogId_fkey",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"application_serviceCatalogId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "application_serviceCatalogId_fkey",
+          "public",
+          "\"public\".\"application\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"application_serviceCatalogId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"application\"\nADD CONSTRAINT \"application_serviceCatalogId_fkey\"\nFOREIGN KEY (\"serviceCatalogId\")\nREFERENCES \"public\".\"serviceCatalog\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"application_serviceCatalogId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "application_serviceCatalogId_fkey",
+          "public",
+          "\"public\".\"application\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.application.application_changeRequestId_fkey",
+    "label": "Add foreign key \"application_changeRequestId_fkey\" on \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "application_changeRequestId_fkey",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"application_changeRequestId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "application_changeRequestId_fkey",
+          "public",
+          "\"public\".\"application\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"application_changeRequestId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"application\"\nADD CONSTRAINT \"application_changeRequestId_fkey\"\nFOREIGN KEY (\"changeRequestId\")\nREFERENCES \"public\".\"changeRequest\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"application_changeRequestId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "application_changeRequestId_fkey",
+          "public",
+          "\"public\".\"application\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.application.application_problemId_fkey",
+    "label": "Add foreign key \"application_problemId_fkey\" on \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "application_problemId_fkey",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"application_problemId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "application_problemId_fkey",
+          "public",
+          "\"public\".\"application\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"application_problemId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"application\"\nADD CONSTRAINT \"application_problemId_fkey\"\nFOREIGN KEY (\"problemId\")\nREFERENCES \"public\".\"problem\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"application_problemId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "application_problemId_fkey",
+          "public",
+          "\"public\".\"application\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.auditLog.auditLog_applicationId_fkey",
+    "label": "Add foreign key \"auditLog_applicationId_fkey\" on \"auditLog\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "auditLog_applicationId_fkey",
+        "table": "auditLog"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"auditLog_applicationId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auditLog_applicationId_fkey",
+          "public",
+          "\"public\".\"auditLog\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"auditLog_applicationId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"auditLog\"\nADD CONSTRAINT \"auditLog_applicationId_fkey\"\nFOREIGN KEY (\"applicationId\")\nREFERENCES \"public\".\"application\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"auditLog_applicationId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "auditLog_applicationId_fkey",
+          "public",
+          "\"public\".\"auditLog\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.knowledgeArticle.knowledgeArticle_problemId_fkey",
+    "label": "Add foreign key \"knowledgeArticle_problemId_fkey\" on \"knowledgeArticle\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "knowledgeArticle_problemId_fkey",
+        "table": "knowledgeArticle"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"knowledgeArticle_problemId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "knowledgeArticle_problemId_fkey",
+          "public",
+          "\"public\".\"knowledgeArticle\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"knowledgeArticle_problemId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"knowledgeArticle\"\nADD CONSTRAINT \"knowledgeArticle_problemId_fkey\"\nFOREIGN KEY (\"problemId\")\nREFERENCES \"public\".\"problem\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"knowledgeArticle_problemId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "knowledgeArticle_problemId_fkey",
+          "public",
+          "\"public\".\"knowledgeArticle\""
+        ]
+      }
+    ]
+  }
+]
