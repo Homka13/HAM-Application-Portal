@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '../config/db';
+import { db } from '../config/db';
 import { NotFoundError, ValidationError } from '../errors';
 
 const SLA_HOURS: Record<string, number> = {
@@ -19,29 +19,34 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 export const createApplication = async (req: Request, res: Response): Promise<void> => {
   const { applicantName, type, priority, description, serviceCatalogId } = req.body;
   const hours = SLA_HOURS[priority] ?? 72;
-  const slaDeadline = new Date(Date.now() + hours * 60 * 60 * 1000);
+  const slaDeadline = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 
-  const application = await prisma.application.create({
-    data: { applicantName, type, priority, description, slaDeadline, serviceCatalogId },
+  const application = await db.orm.public.Application.create({
+    applicantName,
+    type,
+    priority,
+    description,
+    slaDeadline,
+    serviceCatalogId: serviceCatalogId ?? null,
   });
   res.status(201).json(application);
 };
 
 export const getApplications = async (_req: Request, res: Response): Promise<void> => {
-  const applications = await prisma.application.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: { service: true },
-  });
+  const applications = await db.orm.public.Application
+    .orderBy((a) => a.createdAt.desc())
+    .include('service')
+    .all();
   res.status(200).json(applications);
 };
 
 export const getApplicationLogs = async (req: Request, res: Response): Promise<void> => {
   const id = req.params.id as string;
 
-  const logs = await prisma.auditLog.findMany({
-    where: { applicationId: id },
-    orderBy: { createdAt: 'desc' },
-  });
+  const logs = await db.orm.public.AuditLog
+    .where({ applicationId: id })
+    .orderBy((l) => l.createdAt.desc())
+    .all();
   res.status(200).json(logs);
 };
 
@@ -49,8 +54,8 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
   const id = req.params.id as string;
   const { status, changedBy, resolutionNote } = req.body;
 
-  const result = await prisma.$transaction(async (tx) => {
-    const currentApp = await tx.application.findUnique({ where: { id } });
+  const result = await db.transaction(async (tx) => {
+    const currentApp = await tx.orm.public.Application.where({ id }).first();
 
     if (!currentApp) {
       throw new NotFoundError('Application not found');
@@ -71,19 +76,14 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
       );
     }
 
-    const updatedApp = await tx.application.update({
-      where: { id },
-      data: { status },
-    });
+    const updatedApp = await tx.orm.public.Application.where({ id }).update({ status });
 
-    await tx.auditLog.create({
-      data: {
-        applicationId: id,
-        field: 'STATUS',
-        oldValue: currentApp.status,
-        newValue: status,
-        changedBy: changedBy || 'System',
-      },
+    await tx.orm.public.AuditLog.create({
+      applicationId: id,
+      field: 'STATUS',
+      oldValue: currentApp.status,
+      newValue: status,
+      changedBy: changedBy || 'System',
     });
 
     return updatedApp;
@@ -96,9 +96,9 @@ export const linkProblemToApplication = async (req: Request, res: Response): Pro
   const id = req.params.id as string;
   const { problemId } = req.body;
 
-  const updated = await prisma.application.update({
-    where: { id },
-    data: { problemId },
-  });
+  const updated = await db.orm.public.Application.where({ id }).update({ problemId });
+  if (!updated) {
+    throw new NotFoundError('Application not found');
+  }
   res.status(200).json(updated);
 };

@@ -24,13 +24,13 @@ export const errorHandler = (
     return;
   }
 
-  const prismaError = err as { code?: string };
-  if (prismaError.code === 'P2025') {
-    res.status(404).json({ error: 'Resource not found' });
+  const dbError = err as { code?: string; sqlState?: string };
+  if (dbError.sqlState === '23505' || dbError.code === '23505') {
+    res.status(409).json({ error: 'Resource already exists' });
     return;
   }
-  if (prismaError.code === 'P2002') {
-    res.status(409).json({ error: 'Resource already exists' });
+  if (dbError.sqlState === '23503' || dbError.code === '23503') {
+    res.status(409).json({ error: 'Resource is referenced and cannot be modified' });
     return;
   }
 

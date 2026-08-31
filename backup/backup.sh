@@ -1,9 +1,9 @@
 #!/bin/sh
-BACKUP_NAME="dev-$(date +%Y-%m-%d_%H%M%S).db"
+BACKUP_NAME="ham-$(date +%Y-%m-%d_%H%M%S).sql.gz"
 
-cp /db/dev.db /backups/$BACKUP_NAME
+pg_dump "$DATABASE_URL" | gzip > "/backups/$BACKUP_NAME"
 
-find /backups -name "dev-*.db" -mtime +7 -delete
+find /backups -name "ham-*.sql.gz" -mtime +7 -delete
 
 if [ -n "$RCLONE_REMOTE" ]; then
   rclone copy /backups/$BACKUP_NAME $RCLONE_REMOTE 2>/tmp/rclone.err

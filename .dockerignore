@@ -5,3 +5,5 @@ prisma/dev.db-journal
 frontend
 .git
 .env
+src/prisma/contract.json
+src/prisma/contract.d.ts

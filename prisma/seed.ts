@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { db } from '../src/config/db';
 
 const services = [
   // Networking
@@ -19,10 +17,10 @@ const services = [
 
 async function main() {
   for (const svc of services) {
-    await prisma.serviceCatalog.upsert({
-      where: { name: svc.name },
-      update: { category: svc.category, description: svc.description },
+    await db.orm.public.ServiceCatalog.upsert({
       create: svc,
+      update: { category: svc.category, description: svc.description },
+      conflictOn: { name: svc.name },
     });
   }
   console.log(`Seeded ${services.length} ITIL-aligned service catalog entries`);
@@ -33,4 +31,4 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(() => db.close());

@@ -4,7 +4,7 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import client from 'prom-client';
-import prisma from './config/db';
+import { db } from './config/db';
 import applicationRoutes from './routes/applicationRoutes';
 import serviceCatalogRoutes from './routes/serviceCatalogRoutes';
 import changeRoutes from './routes/changeRoutes';
@@ -41,13 +41,34 @@ const ticketsByStatus = new client.Gauge({
   registers: [register],
 });
 
+// PostgreSQL `timestamptz` is returned as `YYYY-MM-DD HH:MM:SS[.ffffff]+00`;
+// normalize it to ISO 8601 so browser Date parsing is reliable everywhere.
+const PG_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}(:\d{2})?|Z)$/;
+
+function normalizeDates(value: unknown): unknown {
+  if (typeof value === 'string') {
+    if (PG_TIMESTAMP_RE.test(value)) {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+    }
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(normalizeDates);
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value)) out[key] = normalizeDates(entry);
+    return out;
+  }
+  return value;
+}
+
 app.use((req, _res, next) => {
   const end = httpRequestDurationMs.startTimer({ method: req.method, route: req.path });
   const originalJson = _res.json.bind(_res);
   _res.json = (body: any) => {
     httpRequestsTotal.inc({ method: req.method, route: req.path, status_code: String(_res.statusCode) });
     end();
-    return originalJson(body);
+    return originalJson(normalizeDates(body));
   };
   next();
 });
@@ -63,12 +84,11 @@ app.use('/api/reports', reportRoutes);
 
 async function refreshTicketGauge() {
   try {
-    const counts = await prisma.application.groupBy({
-      by: ['status'],
-      _count: { status: true },
-    });
+    const counts = await db.orm.public.Application
+      .groupBy('status')
+      .aggregate((agg) => ({ count: agg.count() }));
     ticketsByStatus.reset();
-    counts.forEach((c) => ticketsByStatus.set({ status: c.status }, c._count.status));
+    counts.forEach((c) => ticketsByStatus.set({ status: c.status }, c.count));
   } catch {}
 }
 

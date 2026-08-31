@@ -4,3 +4,5 @@ node_modules
 *.db-journal
 dist
 backups/*.db
+src/prisma/contract.json
+src/prisma/contract.d.ts

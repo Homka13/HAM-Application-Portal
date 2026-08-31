@@ -1,4 +1,22 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ham
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d ham']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - itsm-network
+
   backend:
     build:
       context: .
@@ -6,9 +24,10 @@ services:
     ports:
       - '3000:3000'
     environment:
-      - DATABASE_URL=file:/app/prisma/dev.db
-    volumes:
-      - ./prisma:/app/prisma
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ham
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - itsm-network
 
@@ -19,8 +38,8 @@ services:
     environment:
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
       - RCLONE_REMOTE=${RCLONE_REMOTE:-}
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ham
     volumes:
-      - ./prisma:/db
       - ./backups:/backups
     networks:
       - itsm-network
@@ -54,6 +73,9 @@ services:
       - backend
     networks:
       - itsm-network
+
+volumes:
+  postgres-data:
 
 networks:
   itsm-network:

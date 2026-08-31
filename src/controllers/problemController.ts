@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '../config/db';
+import { db } from '../config/db';
 import { NotFoundError, ValidationError } from '../errors';
 
 const PROBLEM_WORKFLOW: Record<string, string[]> = {
@@ -12,17 +12,15 @@ const PROBLEM_WORKFLOW: Record<string, string[]> = {
 export const createProblem = async (req: Request, res: Response): Promise<void> => {
   const { title, description } = req.body;
 
-  const problem = await prisma.problem.create({
-    data: { title, description },
-  });
+  const problem = await db.orm.public.Problem.create({ title, description });
   res.status(201).json(problem);
 };
 
 export const getProblems = async (_req: Request, res: Response): Promise<void> => {
-  const problems = await prisma.problem.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: { applications: true },
-  });
+  const problems = await db.orm.public.Problem
+    .orderBy((p) => p.createdAt.desc())
+    .include('applications')
+    .all();
   res.status(200).json(problems);
 };
 
@@ -30,8 +28,8 @@ export const updateProblemStatus = async (req: Request, res: Response): Promise<
   const id = req.params.id as string;
   const { status, rootCause, workaround } = req.body;
 
-  const result = await prisma.$transaction(async (tx) => {
-    const current = await tx.problem.findUnique({ where: { id } });
+  const result = await db.transaction(async (tx) => {
+    const current = await tx.orm.public.Problem.where({ id }).first();
 
     if (!current) {
       throw new NotFoundError('Problem record not found');
@@ -42,11 +40,11 @@ export const updateProblemStatus = async (req: Request, res: Response): Promise<
       throw new ValidationError(`Недопустимий перехід: ${current.status} → ${status}`);
     }
 
-    const data: any = { status };
+    const data: { status: string; rootCause?: string; workaround?: string } = { status };
     if (rootCause) data.rootCause = rootCause;
     if (workaround) data.workaround = workaround;
 
-    return tx.problem.update({ where: { id }, data });
+    return tx.orm.public.Problem.where({ id }).update(data);
   });
 
   res.status(200).json(result);

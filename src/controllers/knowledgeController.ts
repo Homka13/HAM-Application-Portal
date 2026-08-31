@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import prisma from '../config/db';
+import { or } from '@prisma/orm-postgres/orm-client';
+import { db } from '../config/db';
 import { NotFoundError, ValidationError } from '../errors';
 
 const KB_WORKFLOW: Record<string, string[]> = {
@@ -11,22 +12,23 @@ const KB_WORKFLOW: Record<string, string[]> = {
 export const createArticle = async (req: Request, res: Response): Promise<void> => {
   const { title, content, category, problemId } = req.body;
 
-  const article = await prisma.knowledgeArticle.create({
-    data: { title, content, category: category || 'General', problemId },
+  const article = await db.orm.public.KnowledgeArticle.create({
+    title,
+    content,
+    category: category || 'General',
+    problemId: problemId ?? null,
   });
   res.status(201).json(article);
 };
 
 export const getArticles = async (req: Request, res: Response): Promise<void> => {
   const { status } = req.query;
-  const where: any = {};
-  if (status) where.status = status;
 
-  const articles = await prisma.knowledgeArticle.findMany({
-    where,
-    orderBy: { updatedAt: 'desc' },
-    include: { problem: { select: { id: true, title: true, status: true } } },
-  });
+  const articles = await db.orm.public.KnowledgeArticle
+    .where({ ...(status ? { status: status as string } : {}) })
+    .orderBy((a) => a.updatedAt.desc())
+    .include('problem', (p) => p.select('id', 'title', 'status'))
+    .all();
   res.status(200).json(articles);
 };
 
@@ -34,10 +36,14 @@ export const updateArticle = async (req: Request, res: Response): Promise<void> 
   const id = req.params.id as string;
   const { title, content, category } = req.body;
 
-  const article = await prisma.knowledgeArticle.update({
-    where: { id },
-    data: { title, content, category },
+  const article = await db.orm.public.KnowledgeArticle.where({ id }).update({
+    title,
+    content,
+    category,
   });
+  if (!article) {
+    throw new NotFoundError('Article not found');
+  }
   res.status(200).json(article);
 };
 
@@ -45,7 +51,7 @@ export const updateArticleStatus = async (req: Request, res: Response): Promise<
   const id = req.params.id as string;
   const { status } = req.body;
 
-  const current = await prisma.knowledgeArticle.findUnique({ where: { id } });
+  const current = await db.orm.public.KnowledgeArticle.where({ id }).first();
   if (!current) {
     throw new NotFoundError('Article not found');
   }
@@ -55,11 +61,10 @@ export const updateArticleStatus = async (req: Request, res: Response): Promise<
     throw new ValidationError(`Недопустимий перехід: ${current.status} → ${status}`);
   }
 
-  const article = await prisma.knowledgeArticle.update({
-    where: { id },
-    data: { status },
-    include: { problem: { select: { id: true, title: true } } },
-  });
+  const article = await db.orm.public.KnowledgeArticle
+    .where({ id })
+    .include('problem', (p) => p.select('id', 'title'))
+    .update({ status });
   res.status(200).json(article);
 };
 
@@ -70,18 +75,18 @@ export const searchArticles = async (req: Request, res: Response): Promise<void>
     return;
   }
 
-  const articles = await prisma.knowledgeArticle.findMany({
-    where: {
-      status: 'PUBLISHED',
-      OR: [
-        { title: { contains: q } },
-        { content: { contains: q } },
-        { category: { contains: q } },
-      ],
-    },
-    orderBy: { updatedAt: 'desc' },
-    take: 5,
-    select: { id: true, title: true, category: true },
-  });
+  const articles = await db.orm.public.KnowledgeArticle
+    .where({ status: 'PUBLISHED' })
+    .where((a) =>
+      or(
+        a.title.like(`%${q}%`),
+        a.content.like(`%${q}%`),
+        a.category.like(`%${q}%`),
+      ),
+    )
+    .orderBy((a) => a.updatedAt.desc())
+    .limit(5)
+    .select('id', 'title', 'category')
+    .all();
   res.status(200).json(articles);
 };

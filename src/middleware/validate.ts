@@ -24,7 +24,15 @@ export const validate = (schemas: ValidationSchemas) => {
         next(result.error);
         return;
       }
-      req.query = result.data as any;
+      // Express 5 exposes `req.query` as a read-only getter that re-parses the
+      // query string on each access, so it cannot be reassigned. Replace the
+      // getter with one returning the validated object instead.
+      const validatedQuery = result.data;
+      Object.defineProperty(req, 'query', {
+        configurable: true,
+        enumerable: true,
+        get: () => validatedQuery,
+      });
     }
 
     if (schemas.body) {
