@@ -11,6 +11,7 @@ import changeRoutes from './routes/changeRoutes';
 import problemRoutes from './routes/problemRoutes';
 import knowledgeRoutes from './routes/knowledgeRoutes';
 import reportRoutes from './routes/reportRoutes';
+import { errorHandler } from './middleware/errorHandler';
 import { initSlaEscalation } from './cronJobs';
 
 const app = express();
@@ -80,6 +81,8 @@ app.get('/metrics', async (_req, res) => {
   res.set('Content-Type', register.contentType);
   res.end(await register.metrics());
 });
+
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

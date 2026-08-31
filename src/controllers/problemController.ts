@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
+import { NotFoundError, ValidationError } from '../errors';
 
 const PROBLEM_WORKFLOW: Record<string, string[]> = {
   NEW: ['RCA'],
@@ -8,24 +9,13 @@ const PROBLEM_WORKFLOW: Record<string, string[]> = {
   RESOLVED: [],
 };
 
-class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ValidationError';
-  }
-}
-
 export const createProblem = async (req: Request, res: Response): Promise<void> => {
   const { title, description } = req.body;
-  try {
-    const problem = await prisma.problem.create({
-      data: { title, description },
-    });
-    res.status(201).json(problem);
-  } catch (error) {
-    console.error('Failed to create problem:', error);
-    res.status(500).json({ error: 'Failed to create problem record' });
-  }
+
+  const problem = await prisma.problem.create({
+    data: { title, description },
+  });
+  res.status(201).json(problem);
 };
 
 export const getProblems = async (_req: Request, res: Response): Promise<void> => {
@@ -40,39 +30,24 @@ export const updateProblemStatus = async (req: Request, res: Response): Promise<
   const id = req.params.id as string;
   const { status, rootCause, workaround } = req.body;
 
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      const current = await tx.problem.findUnique({ where: { id } });
+  const result = await prisma.$transaction(async (tx) => {
+    const current = await tx.problem.findUnique({ where: { id } });
 
-      if (!current) {
-        throw new Error('Problem record not found');
-      }
-
-      const allowedStatuses = PROBLEM_WORKFLOW[current.status] || [];
-      if (!allowedStatuses.includes(status)) {
-        throw new ValidationError(
-          `Недопустимий перехід: ${current.status} → ${status}`
-        );
-      }
-
-      const data: any = { status };
-      if (rootCause) data.rootCause = rootCause;
-      if (workaround) data.workaround = workaround;
-
-      return tx.problem.update({ where: { id }, data });
-    });
-
-    res.status(200).json(result);
-  } catch (error: any) {
-    if (error.message === 'Problem record not found') {
-      res.status(404).json({ error: error.message });
-      return;
+    if (!current) {
+      throw new NotFoundError('Problem record not found');
     }
-    if (error instanceof ValidationError) {
-      res.status(400).json({ error: error.message });
-      return;
+
+    const allowedStatuses = PROBLEM_WORKFLOW[current.status] || [];
+    if (!allowedStatuses.includes(status)) {
+      throw new ValidationError(`Недопустимий перехід: ${current.status} → ${status}`);
     }
-    console.error('Failed to update problem status:', error);
-    res.status(500).json({ error: 'Failed to update problem status' });
-  }
+
+    const data: any = { status };
+    if (rootCause) data.rootCause = rootCause;
+    if (workaround) data.workaround = workaround;
+
+    return tx.problem.update({ where: { id }, data });
+  });
+
+  res.status(200).json(result);
 };
