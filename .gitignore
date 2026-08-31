@@ -6,3 +6,5 @@ dist
 backups/*.db
 src/prisma/contract.json
 src/prisma/contract.d.ts
+.prisma-composer/
+.alchemy/
