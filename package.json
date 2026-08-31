@@ -6,7 +6,6 @@
   "main": "index.js",
   "scripts": {
     "start": "tsx src/index.ts",
-    "dev": "tsx watch src/index.ts",
     "build": "prisma contract emit && npm run build --prefix frontend && esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --target=node22 --outfile=dist/index.js && node copy-frontend.js",
     "contract:emit": "prisma contract emit",
     "db:init": "prisma db init",
@@ -58,5 +57,8 @@
     "@effect/sql-pg": "4.0.0-rc.112",
     "@effect/vitest": "4.0.0-rc.112",
     "effect": "4.0.0-rc.112"
-  }
+  },
+  "workspaces": [
+    "frontend"
+  ]
 }
