@@ -21,7 +21,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT =
+  process.env.PORT ||
+  process.env.COMPOSER_HAMAPPLICATIONPORTAL_PORT ||
+  Object.entries(process.env).find(([k]) => k.endsWith('_PORT'))?.[1] ||
+  3000;
 
 const register = new client.Registry();
 client.collectDefaultMetrics({ register });
