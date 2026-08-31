@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import client from 'prom-client';
@@ -13,6 +16,9 @@ import knowledgeRoutes from './routes/knowledgeRoutes';
 import reportRoutes from './routes/reportRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initSlaEscalation } from './cronJobs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -75,6 +81,21 @@ app.use((req, _res, next) => {
 
 app.use(cors());
 app.use(express.json());
+
+// Determine frontend dist directory
+const possibleDistPaths = [
+  path.join(__dirname, 'public'),
+  path.join(process.cwd(), 'dist/public'),
+  path.join(process.cwd(), 'frontend/dist'),
+  path.join(__dirname, '../frontend/dist'),
+  path.join(__dirname, '../../frontend/dist'),
+];
+const distPath = possibleDistPaths.find((p) => fs.existsSync(p));
+
+if (distPath) {
+  app.use(express.static(distPath));
+}
+
 app.use('/api/applications', applicationRoutes);
 app.use('/api/services', serviceCatalogRoutes);
 app.use('/api/changes', changeRoutes);
@@ -86,14 +107,14 @@ async function refreshTicketGauge() {
   try {
     const counts = await db.orm.public.Application
       .groupBy('status')
-      .aggregate((agg) => ({ count: agg.count() }));
+      .aggregate((agg: any) => ({ count: agg.count() }));
     ticketsByStatus.reset();
-    counts.forEach((c) => ticketsByStatus.set({ status: c.status }, c.count));
+    counts.forEach((c: any) => ticketsByStatus.set({ status: c.status }, c.count));
   } catch {}
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
 app.get('/metrics', async (_req, res) => {
@@ -102,10 +123,40 @@ app.get('/metrics', async (_req, res) => {
   res.end(await register.metrics());
 });
 
+// Root & SPA fallback handler
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path === '/metrics') {
+    return next();
+  }
+  if (distPath && fs.existsSync(path.join(distPath, 'index.html'))) {
+    return res.sendFile(path.join(distPath, 'index.html'));
+  }
+  res.json({
+    name: 'HAM Application Portal API',
+    status: 'online',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      applications: '/api/applications',
+      services: '/api/services',
+      changes: '/api/changes',
+      problems: '/api/problems',
+      kb: '/api/kb',
+      reports: '/api/reports',
+      metrics: '/metrics',
+    },
+  });
+});
+
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  initSlaEscalation();
+app.listen(Number(PORT), '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
+  try {
+    initSlaEscalation();
+  } catch (err) {
+    console.error('Failed to init SLA escalation:', err);
+  }
 });
+
 

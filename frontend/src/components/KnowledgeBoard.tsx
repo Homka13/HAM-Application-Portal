@@ -13,7 +13,7 @@ interface Article {
   updatedAt: string;
 }
 
-const API = 'http://localhost:3000/api/kb';
+const API = '/api/kb';
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Чернетка',

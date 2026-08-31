@@ -9,7 +9,7 @@ interface AuditLog {
   createdAt: string;
 }
 
-const API = 'http://localhost:3000/api/applications';
+const API = '/api/applications';
 
 const FIELD_LABELS: Record<string, string> = {
   STATUS: 'статус',

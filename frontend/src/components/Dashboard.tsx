@@ -29,7 +29,7 @@ export const Dashboard = () => {
   const pieTooltipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/reports/stats')
+    fetch('/api/reports/stats')
       .then((r) => r.json())
       .then(setStats);
   }, []);

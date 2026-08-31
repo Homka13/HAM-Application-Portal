@@ -27,8 +27,8 @@ interface Application {
   createdAt: string;
 }
 
-const API = 'http://localhost:3000/api/applications';
-const SERVICES_API = 'http://localhost:3000/api/services';
+const API = '/api/applications';
+const SERVICES_API = '/api/services';
 
 const PRIORITY_COLORS: Record<string, string> = {
   LOW: 'bg-gray-100 text-gray-700',
@@ -92,7 +92,7 @@ function App() {
         return;
       }
       try {
-        const res = await fetch(`http://localhost:3000/api/kb/search?q=${encodeURIComponent(description)}`);
+        const res = await fetch(`/api/kb/search?q=${encodeURIComponent(description)}`);
         setSuggestions(await res.json());
       } catch {
         setSuggestions([]);

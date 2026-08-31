@@ -15,7 +15,7 @@ interface ChangeRequest {
   applications?: { id: string; applicantName: string }[];
 }
 
-const API = 'http://localhost:3000/api/changes';
+const API = '/api/changes';
 
 const CHANGE_WORKFLOW: Record<string, string[]> = {
   DRAFT: ['PENDING'],

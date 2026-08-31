@@ -12,7 +12,7 @@ interface Problem {
   applications?: { id: string; applicantName: string }[];
 }
 
-const API = 'http://localhost:3000/api/problems';
+const API = '/api/problems';
 
 const PROBLEM_WORKFLOW: Record<string, string[]> = {
   NEW: ['RCA'],
