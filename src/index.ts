@@ -20,6 +20,7 @@ import { initSlaEscalation } from './cronJobs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// @ts-ignore
 import service from '../service.mjs';
 
 const app = express();
