@@ -20,12 +20,25 @@ import { initSlaEscalation } from './cronJobs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+import service from '../service.mjs';
+
 const app = express();
-const PORT =
-  process.env.PORT ||
-  process.env.COMPOSER_HAMAPPLICATIONPORTAL_PORT ||
-  Object.entries(process.env).find(([k]) => k.endsWith('_PORT'))?.[1] ||
-  3000;
+
+function getPort(): number {
+  try {
+    const p = (service as any)?.port?.();
+    if (typeof p === 'number') return p;
+  } catch {}
+  if (process.env.PORT) return Number(process.env.PORT);
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.includes('PORT') && value && !Number.isNaN(Number(value))) {
+      return Number(value);
+    }
+  }
+  return 3000;
+}
+
+const PORT = getPort();
 
 const register = new client.Registry();
 client.collectDefaultMetrics({ register });
