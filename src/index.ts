@@ -128,7 +128,7 @@ app.get('/metrics', async (_req, res) => {
 });
 
 // Root & SPA fallback handler
-app.get('*', (req, res, next) => {
+app.use((req, res, next) => {
   if (req.path.startsWith('/api') || req.path === '/metrics') {
     return next();
   }
