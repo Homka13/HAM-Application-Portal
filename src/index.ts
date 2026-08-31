@@ -26,16 +26,18 @@ import service from '../service.mjs';
 const app = express();
 
 function getPort(): number {
-  try {
-    const p = (service as any)?.port?.();
-    if (typeof p === 'number') return p;
-  } catch {}
-  if (process.env.PORT) return Number(process.env.PORT);
+  if (process.env.PORT && !Number.isNaN(Number(process.env.PORT))) {
+    return Number(process.env.PORT);
+  }
   for (const [key, value] of Object.entries(process.env)) {
     if (key.includes('PORT') && value && !Number.isNaN(Number(value))) {
       return Number(value);
     }
   }
+  try {
+    const p = (service as any)?.port?.();
+    if (typeof p === 'number') return p;
+  } catch {}
   return 3000;
 }
 
@@ -168,8 +170,21 @@ app.use((req, res, next) => {
 
 app.use(errorHandler);
 
-app.listen(Number(PORT), '0.0.0.0', () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
+// Global safety error handlers to prevent silent container exits
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] Unhandled Rejection:', reason);
+});
+
+// Additional health endpoints expected by various cloud load balancers
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/livez', (req, res) => res.json({ status: 'ok' }));
+app.get('/readyz', (req, res) => res.json({ status: 'ok' }));
+
+const server = app.listen(Number(PORT), () => {
+  console.log(`Server running on port ${PORT}`);
   try {
     initSlaEscalation();
   } catch (err) {
@@ -177,7 +192,12 @@ app.listen(Number(PORT), '0.0.0.0', () => {
   }
 });
 
+server.on('error', (err) => {
+  console.error('HTTP Server Error:', err);
+});
+
 export default app;
+
 
 
 

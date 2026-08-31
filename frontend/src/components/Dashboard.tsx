@@ -31,7 +31,12 @@ export const Dashboard = () => {
   useEffect(() => {
     fetch('/api/reports/stats')
       .then((r) => r.json())
-      .then(setStats);
+      .then((data) => {
+        if (data && !data.error && Array.isArray(data.incidentVolume)) {
+          setStats(data);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {

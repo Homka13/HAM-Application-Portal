@@ -41,9 +41,14 @@ export const KnowledgeBoard = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchArticles = async () => {
-    const url = statusFilter ? `${API}?status=${statusFilter}` : API;
-    const res = await fetch(url);
-    setArticles(await res.json());
+    try {
+      const url = statusFilter ? `${API}?status=${statusFilter}` : API;
+      const res = await fetch(url);
+      const data = await res.json();
+      setArticles(Array.isArray(data) ? data : []);
+    } catch {
+      setArticles([]);
+    }
   };
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../config/db';
 import { NotFoundError, ValidationError } from '../errors';
+import { localStore } from '../lib/storage';
 
 const PROBLEM_WORKFLOW: Record<string, string[]> = {
   NEW: ['RCA'],
@@ -12,25 +13,59 @@ const PROBLEM_WORKFLOW: Record<string, string[]> = {
 export const createProblem = async (req: Request, res: Response): Promise<void> => {
   const { title, description } = req.body;
 
-  const problem = await db.orm.public.Problem.create({ title, description });
-  res.status(201).json(problem);
+  try {
+    const problem = await db.orm.public.Problem.create({ title, description });
+    res.status(201).json(problem);
+  } catch {
+    const problem = localStore.createProblem({ title, description });
+    res.status(201).json(problem);
+  }
 };
 
 export const getProblems = async (_req: Request, res: Response): Promise<void> => {
-  const problems = await db.orm.public.Problem
-    .orderBy((p) => p.createdAt.desc())
-    .include('applications')
-    .all();
-  res.status(200).json(problems);
+  try {
+    const problems = await db.orm.public.Problem
+      .orderBy((p) => p.createdAt.desc())
+      .include('applications')
+      .all();
+    res.status(200).json(problems);
+  } catch {
+    const problems = localStore.getProblems();
+    res.status(200).json(problems);
+  }
 };
 
 export const updateProblemStatus = async (req: Request, res: Response): Promise<void> => {
   const id = req.params.id as string;
   const { status, rootCause, workaround } = req.body;
 
-  const result = await db.transaction(async (tx) => {
-    const current = await tx.orm.public.Problem.where({ id }).first();
+  try {
+    const result = await db.transaction(async (tx) => {
+      const current = await tx.orm.public.Problem.where({ id }).first();
 
+      if (!current) {
+        throw new NotFoundError('Problem record not found');
+      }
+
+      const allowedStatuses = PROBLEM_WORKFLOW[current.status] || [];
+      if (!allowedStatuses.includes(status)) {
+        throw new ValidationError(`Недопустимий перехід: ${current.status} → ${status}`);
+      }
+
+      const data: { status: string; rootCause?: string; workaround?: string } = { status };
+      if (rootCause) data.rootCause = rootCause;
+      if (workaround) data.workaround = workaround;
+
+      return tx.orm.public.Problem.where({ id }).update(data);
+    });
+
+    res.status(200).json(result);
+  } catch (err: any) {
+    if (err instanceof NotFoundError || err instanceof ValidationError) {
+      throw err;
+    }
+
+    const current = localStore.getProblems().find((p) => p.id === id);
     if (!current) {
       throw new NotFoundError('Problem record not found');
     }
@@ -44,8 +79,7 @@ export const updateProblemStatus = async (req: Request, res: Response): Promise<
     if (rootCause) data.rootCause = rootCause;
     if (workaround) data.workaround = workaround;
 
-    return tx.orm.public.Problem.where({ id }).update(data);
-  });
-
-  res.status(200).json(result);
+    const updated = localStore.updateProblem(id, data);
+    res.status(200).json(updated);
+  }
 };

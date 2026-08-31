@@ -42,7 +42,7 @@
 
 ### 5. Dynamic Cloud Port & Database URL Binding
 - **Problem**: Prisma Compute assigns dynamic container ports and database connection strings at runtime (`COMPOSER_*_PORT`, `COMPOSER_*_DB_URL`).
-- **Solution**: Added multi-layer fallbacks in `src/index.ts` (listening on `0.0.0.0` with dynamic port) and `src/config/db.ts`.
+- **Solution**: Added multi-layer fallbacks in `src/index.ts` (dual-stack listening on `process.env.PORT || 3000`) and `src/config/db.ts` (using `service.load()` and environment variables).
 
 ### 6. Database Migration Requirement for Prisma Cloud
 - **Problem**: Deploy pipeline failed with `MIGRATION_PATH_NOT_FOUND` because cloud deployment requires authored migration files to provision a clean database.
@@ -51,3 +51,18 @@
 ### 7. Local Testing Suite to Prevent Deploy Spam
 - **Problem**: Deploying each small fix to GitHub Actions took time and created unnecessary commits.
 - **Solution**: Created `test/smoke.test.js` and added `npm test`. In 3 seconds, it validates the build, launches the bundled server in a background process, tests `/api/health`, `/`, `/metrics`, and SPA fallback, and shuts down cleanly.
+
+### 8. Lockfile Version Mismatch on CI (`bun.lock` vs `package-lock.json`)
+- **Problem**: `bun.lock` generated locally in WSL under Bun 1.4.0 caused `UnknownLockfileVersion` on GitHub Actions running Bun 1.3.13.
+- **Solution**: Removed `bun.lock` from git tracking and ignored it in `.gitignore` so CI uses `npm ci` with `package-lock.json`.
+
+### 9. Frontend White Screen Crash Prevention & ErrorBoundary
+- **Problem**: When the database was offline or returned an error object, frontend components calling `.filter()` or `.map()` threw runtime TypeErrors, causing a blank white screen.
+- **Solution**: Added `frontend/src/components/ErrorBoundary.tsx` wrapping the application, and guarded all state setters with `Array.isArray(data) ? data : []`.
+
+### 10. Resilient Data Layer (`src/lib/storage.ts`) & Flexible Zod Validation
+- **Problem**: Running without a local PostgreSQL daemon caused 500 errors on ticket creation, and strict `uuid` validation in Zod schemas rejected standard service catalog IDs (e.g. `srv-1`). Also, the admin/user toggle was redundant for regular workflow.
+- **Solution**:
+  - Removed admin/user switcher from the header (defaulting to standard user).
+  - Created `src/lib/storage.ts` providing seamless local JSON persistence with pre-seeded services and KB articles when PostgreSQL is offline, while automatically routing to Prisma Postgres in production.
+  - Relaxed Zod validation to accept string IDs (`srv-*` and UUIDs).

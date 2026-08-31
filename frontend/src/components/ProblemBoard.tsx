@@ -51,8 +51,13 @@ export const ProblemBoard = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchProblems = async () => {
-    const res = await fetch(API);
-    setProblems(await res.json());
+    try {
+      const res = await fetch(API);
+      const data = await res.json();
+      setProblems(Array.isArray(data) ? data : []);
+    } catch {
+      setProblems([]);
+    }
   };
 
   useEffect(() => {

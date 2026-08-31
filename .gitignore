@@ -9,6 +9,9 @@ backups/*.db
 .prisma/
 bun.lock
 bun.lockb
+data/
+index.js
+
 
 
 

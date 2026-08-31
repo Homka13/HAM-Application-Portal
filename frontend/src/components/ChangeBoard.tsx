@@ -77,8 +77,13 @@ export const ChangeBoard = () => {
   const [requestedBy, setRequestedBy] = useState('');
 
   const fetchChanges = async () => {
-    const res = await fetch(API);
-    setChanges(await res.json());
+    try {
+      const res = await fetch(API);
+      const data = await res.json();
+      setChanges(Array.isArray(data) ? data : []);
+    } catch {
+      setChanges([]);
+    }
   };
 
   useEffect(() => {

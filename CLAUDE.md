@@ -31,15 +31,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is an ITIL/ITSM-style application portal:
 - **Monorepo / Workspaces**: Root `package.json` configures `"workspaces": ["frontend"]` so `npm install` and `npm ci` resolve all backend and frontend dependencies in a single step.
 - **Backend**: Express 5 + TypeScript + Prisma 8 ORM for PostgreSQL.
-  - Controllers in `src/controllers/*` communicate with database via `src/config/db.ts`.
+  - Storage Layer: Hybrid resilient storage via `src/lib/storage.ts` — automatically queries Prisma Postgres in production and falls back to persistent local storage (`data/local-db.json`) in local development when PostgreSQL is not running.
   - Serves compiled React frontend from `dist/public` with an Express 5 compatible SPA fallback.
-  - Binds to `0.0.0.0` with dynamic port (`PORT` / `COMPOSER_*_PORT`) and dynamic database connection (`DATABASE_URL` / `COMPOSER_*_DB_URL`).
+  - Binds dynamically to `process.env.PORT || 3000` on dual-stack host.
   - Domain models: `Application` (service requests & incidents), `ServiceCatalog`, `ChangeRequest`, `Problem`, `KnowledgeArticle`, and `AuditLog`.
   - Background SLA escalation (`src/cronJobs.ts`) runs every 15 minutes to escalate approaching deadlines to CRITICAL priority with audit logging.
   - Prometheus metrics exposed at `/metrics` (`http_requests_total`, `http_request_duration_ms`, `itsm_tickets_by_status`).
-- **Frontend**: React 19 + Vite + TypeScript + Tailwind CSS (SPA).
+- **Frontend**: React 19 + Vite + TypeScript + Tailwind CSS (SPA) wrapped in `ErrorBoundary`.
   - Feature boards: `Dashboard` (custom D3 charts), `ChangeBoard`, `ProblemBoard`, `KnowledgeBoard`, `AuditTimeline`.
-  - All API calls use relative `/api/...` endpoints.
+  - All API calls use relative `/api/...` endpoints with array guards.
   - UI language is Ukrainian.
 
 ---
@@ -66,7 +66,12 @@ The repository is configured for automated continuous deployment via **GitHub Ac
 4. **Express 5 SPA Fallback Routing**:
    - Express 5 with `path-to-regexp` v8 rejects `app.get('*')` with `PathError`. Use `app.use((req, res, next) => ...)` for catch-all fallback routing.
 5. **Dynamic Host & Port Binding**:
-   - Must listen on `0.0.0.0` (not `127.0.0.1`) so OpenResty reverse proxy can route traffic.
-   - Dynamic port selection: `process.env.PORT || process.env.COMPOSER_HAMAPPLICATIONPORTAL_PORT || 3000`.
+   - Dual-stack listening on `process.env.PORT || 3000` allows reverse proxy routing across IPv4/IPv6 interfaces.
 6. **Database Migration Requirement in Cloud**:
    - Prisma deploy pipelines do not automatically generate schemas on the fly; authored migrations in `migrations/app/` are required.
+7. **Lockfile Version Mismatch (`bun.lock` vs `package-lock.json`)**:
+   - `bun.lock` generated in newer Bun versions fails older CI runners. Kept `bun.lock` in `.gitignore` and rely on standard `package-lock.json`.
+8. **Frontend White Screen Prevention**:
+   - Added `ErrorBoundary` and guarded all component state setters with `Array.isArray(data) ? data : []`.
+9. **Zero-Config Local Storage & Zod String IDs**:
+   - Added `src/lib/storage.ts` and updated Zod validation to allow custom string IDs (`srv-*`) alongside UUIDs.

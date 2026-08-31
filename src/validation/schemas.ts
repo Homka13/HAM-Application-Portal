@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const uuid = z.string().uuid();
+const idString = z.string().min(1);
 
 // Shared enum values (stored as strings in the Prisma schema).
 const applicationType = z.enum(['SERVICE_REQUEST', 'INCIDENT']);
@@ -12,7 +12,7 @@ const changeStatus = z.enum(['DRAFT', 'PENDING', 'APPROVED', 'IMPLEMENTED', 'REJ
 const problemStatus = z.enum(['NEW', 'RCA', 'KNOWN_ERROR', 'RESOLVED']);
 const articleStatus = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
 
-export const idParamSchema = z.object({ id: uuid });
+export const idParamSchema = z.object({ id: idString });
 
 // Applications
 export const createApplicationBody = z.object({
@@ -20,7 +20,7 @@ export const createApplicationBody = z.object({
   type: applicationType.default('SERVICE_REQUEST'),
   priority: priority.default('LOW'),
   description: z.string().optional(),
-  serviceCatalogId: uuid.nullish(),
+  serviceCatalogId: z.string().nullish(),
 });
 
 export const updateApplicationStatusBody = z.object({
@@ -29,7 +29,7 @@ export const updateApplicationStatusBody = z.object({
   resolutionNote: z.string().optional(),
 });
 
-export const linkProblemBody = z.object({ problemId: uuid });
+export const linkProblemBody = z.object({ problemId: idString });
 
 // Changes
 export const createChangeBody = z.object({
@@ -46,7 +46,7 @@ export const updateChangeStatusBody = z.object({
   approvedBy: z.string().optional(),
 });
 
-export const linkApplicationBody = z.object({ applicationId: uuid });
+export const linkApplicationBody = z.object({ applicationId: idString });
 
 // Problems
 export const createProblemBody = z.object({
@@ -60,26 +60,28 @@ export const updateProblemStatusBody = z.object({
   workaround: z.string().optional(),
 });
 
-// Knowledge base
+// Knowledge Base
 export const createArticleBody = z.object({
   title: z.string().trim().min(1, 'title is required'),
   content: z.string().trim().min(1, 'content is required'),
-  category: z.string().trim().min(1).optional(),
-  problemId: uuid.nullish(),
+  category: z.string().trim().min(1, 'category is required'),
+  problemId: z.string().nullish(),
 });
 
-export const updateArticleBody = z
-  .object({
-    title: z.string().trim().min(1).optional(),
-    content: z.string().trim().min(1).optional(),
-    category: z.string().trim().min(1).optional(),
-  })
-  .refine((data) => Object.keys(data).length > 0, {
-    message: 'At least one field is required',
-  });
+export const updateArticleBody = z.object({
+  title: z.string().trim().min(1).optional(),
+  content: z.string().trim().min(1).optional(),
+  category: z.string().trim().min(1).optional(),
+});
 
-export const updateArticleStatusBody = z.object({ status: articleStatus });
+export const updateArticleStatusBody = z.object({
+  status: articleStatus,
+});
 
-export const getArticlesQuery = z.object({ status: articleStatus.optional() });
+export const getArticlesQuery = z.object({
+  status: articleStatus.optional(),
+});
 
-export const searchArticlesQuery = z.object({ q: z.string().optional() });
+export const searchArticlesQuery = z.object({
+  q: z.string().trim().min(1, 'q is required'),
+});

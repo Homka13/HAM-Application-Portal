@@ -23,7 +23,8 @@ export const AuditTimeline = ({ appId }: { appId: string }) => {
   useEffect(() => {
     fetch(`${API}/${appId}/logs`)
       .then((res) => res.json())
-      .then(setLogs);
+      .then((data) => setLogs(Array.isArray(data) ? data : []))
+      .catch(() => setLogs([]));
   }, [appId]);
 
   if (logs.length === 0) {

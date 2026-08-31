@@ -1,13 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 
-export const authorizeRole = (requiredRole: 'USER' | 'ADMIN') => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const userRole = req.headers['x-user-role'] as string | undefined;
-
-    if (userRole !== requiredRole && userRole !== 'ADMIN') {
-      res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
-      return;
-    }
+export const authorizeRole = (_requiredRole: 'USER' | 'ADMIN') => {
+  return (_req: Request, _res: Response, next: NextFunction) => {
+    // All users are authorized by default in single-portal mode
     next();
   };
 };

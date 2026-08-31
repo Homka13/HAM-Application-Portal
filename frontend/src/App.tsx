@@ -70,7 +70,7 @@ const STATUS_ACTION_LABELS: Record<string, string> = {
 };
 
 function App() {
-  const { role, setRole } = useUser();
+  const { role } = useUser();
   const [applications, setApplications] = useState<Application[]>([]);
   const [services, setServices] = useState<ServiceCatalog[]>([]);
   const [applicantName, setApplicantName] = useState('');
@@ -102,7 +102,7 @@ function App() {
   }, [description, tab]);
 
   const filteredApplications = useMemo(() => {
-    let result = applications;
+    let result = Array.isArray(applications) ? applications : [];
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -123,15 +123,23 @@ function App() {
   }, [applications, filter, searchQuery]);
 
   const fetchApplications = async () => {
-    const res = await fetch(API);
-    const data = await res.json();
-    setApplications(data);
+    try {
+      const res = await fetch(API);
+      const data = await res.json();
+      setApplications(Array.isArray(data) ? data : []);
+    } catch {
+      setApplications([]);
+    }
   };
 
   const fetchServices = async () => {
-    const res = await fetch(SERVICES_API);
-    const data = await res.json();
-    setServices(data);
+    try {
+      const res = await fetch(SERVICES_API);
+      const data = await res.json();
+      setServices(Array.isArray(data) ? data : []);
+    } catch {
+      setServices([]);
+    }
   };
 
   useEffect(() => {
@@ -179,34 +187,9 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-4">
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">
           Портал заявок HAM
         </h1>
-
-        <div className="flex justify-center mb-8">
-          <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden">
-            <button
-              onClick={() => setRole('USER')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                role === 'USER'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              👤 Користувач
-            </button>
-            <button
-              onClick={() => setRole('ADMIN')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                role === 'ADMIN'
-                  ? 'bg-red-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              🛡️ Адміністратор
-            </button>
-          </div>
-        </div>
 
         <div className="flex justify-center mb-8">
           <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden">
