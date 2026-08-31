@@ -1,35 +1,53 @@
-# CLAUDE.md
+# MEMORY.md — Project Knowledge Base & Deployment History
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project Overview
 
-## Commands
+**HAM Application Portal** is an ITIL/ITSM-compliant management portal built with:
+- **Backend**: Node.js, Express 5, TypeScript, Prisma 8 ORM for PostgreSQL.
+- **Frontend**: React 19, Vite, TypeScript, Tailwind CSS, custom D3.js visualization charts.
+- **Monitoring & Metrics**: Prometheus client (`/metrics`) + Grafana dashboards.
+- **Deployment Platform**: Prisma Cloud Compute + Prisma Postgres (`eu-central-1`) via GitHub Actions CI/CD.
 
-Backend (repo root):
-- `npm run dev` — run the API with nodemon (`src/index.ts`, port 3000 by default)
-- `npm run build` — compile TypeScript to `dist/` via `tsc`
-- `npm start` — run the compiled server (`dist/index.js`)
-- `npx prisma migrate dev` — apply/create a Prisma migration (SQLite db at `prisma/dev.db`)
-- `npx prisma generate` — regenerate the Prisma client after schema changes
-- `npx prisma db seed` — run `prisma/seed.ts` (configured via the `prisma.seed` field in package.json)
-- No test suite exists yet (`npm test` is a placeholder that exits non-zero)
+---
 
-Frontend (`frontend/`):
-- `npm run dev` — Vite dev server
-- `npm run build` — `tsc -b && vite build`
-- `npm run lint` — `oxlint`
-- `npm run preview` — preview the production build
+## Key Commands
 
-Docker: `docker-compose.yml` at the root wires up `backend`, `frontend`, a `backup` service (rclone + Slack webhook), and a `prometheus`/`grafana` pair for metrics.
+- `npm run dev` — Run development server with auto-reloading (`tsx watch src/index.ts`)
+- `npm run build` — Build full stack: Prisma contract emit + Vite frontend build + standalone backend esbuild bundle + asset copy
+- `npm test` — Run full build + local automated smoke tests (`test/smoke.test.js`)
+- `npm run contract:emit` — Emit Prisma 8 contract JSON and TypeScript declarations
+- `npm run db:update` — Synchronize database schema locally
+- `npm run db:migrate` — Apply planned database migrations
+- `npm run seed` — Seed initial database records (`prisma/seed.ts`)
 
-## Architecture
+---
 
-This is an ITSM/ITIL-style application portal: two independent npm projects (backend at root, frontend in `frontend/`) with no shared package or monorepo tooling — install and run each separately.
+## Solved Issues & Deployment Roadmap
 
-**Backend** — Express + TypeScript + Prisma (SQLite), entry point `src/index.ts`:
-- Route → controller pattern with no service/repository layer; controllers in `src/controllers/*` talk to Prisma directly via `src/config/db.ts`.
-- Domain models (`prisma/schema.prisma`): `Application` (the core ticket, with `type` SERVICE_REQUEST/INCIDENT and `status` NEW/IN_PROGRESS/RESOLVED/CLOSED) links optionally to `ServiceCatalog`, `ChangeRequest`, and `Problem`; every field change on an `Application` is expected to produce an `AuditLog` row (see `applicationController`). `Problem` can have one `KnowledgeArticle`.
-- Auth is a stand-in, not real authentication: `authMiddleware.ts`'s `authorizeRole` just reads the `x-user-role` header (`USER`/`ADMIN`) — there's no session, token, or user table. The frontend's `UserContext` just toggles this header value client-side.
-- `cronJobs.ts` runs an SLA auto-escalation job every 15 minutes: any non-closed, non-CRITICAL application within 30 minutes of `slaDeadline` gets bumped to CRITICAL priority, with a matching `AuditLog` entry written in the same transaction.
-- Prometheus metrics are wired directly into `index.ts` (request counter/histogram middleware, a ticket-by-status gauge refreshed on scrape) and exposed at `/metrics`; app routes live under `/api/applications`, `/api/services`, `/api/changes`, `/api/problems`, `/api/kb`, `/api/reports`.
+### 1. Build Failure in Cloud CI (`npm run build exited with status 2`)
+- **Problem**: `contract.json` and `contract.d.ts` were in `.gitignore`. When CI cloned the repository, static imports in `module.mjs` failed before compilation could run.
+- **Solution**: Removed contract files from `.gitignore`, emitted schema contracts, and committed `src/prisma/contract.json` and `src/prisma/contract.d.ts` directly into version control.
 
-**Frontend** — React 19 + Vite + TypeScript + Tailwind, single-page (no router): `App.tsx` owns the applications list/board and switches between feature components (`Dashboard`, `ChangeBoard`, `ProblemBoard`, `KnowledgeBoard`, `AuditTimeline`) in `frontend/src/components/`. Dashboard charts are hand-built with D3 (not a chart library — Recharts was removed in favor of D3). The API base URL is hardcoded to `http://localhost:3000/api/...` in the component files rather than read from env config. UI copy is in Ukrainian.
+### 2. Frontend Missing Dependencies on CI (`npm ci exited with status 1`)
+- **Problem**: Subdirectory `frontend/` had separate dependencies that were not installed when CI ran `npm ci` at the root. TypeScript compiler failed finding `React`, `d3`, `@vitejs/plugin-react`.
+- **Solution**: Configured `"workspaces": ["frontend"]` in root `package.json` and synchronized `package-lock.json` so `npm ci` installs all workspace packages in a single pass.
+
+### 3. OpenResty 502 Bad Gateway — Missing Node Modules in Cloud Containers
+- **Problem**: Prisma Compute does not preserve `node_modules` inside deployment containers. Using `esbuild --packages=external` left imports unbundled, causing Node to crash on boot (`Cannot find package 'express'`).
+- **Solution**: Updated `esbuild` to bundle all dependencies into a standalone `dist/index.js` (3.3 MB) and added `--banner:js="import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);"` for CommonJS compatibility.
+
+### 4. OpenResty 502 Bad Gateway — Express 5 Route Parsing Error
+- **Problem**: Express 5 uses `path-to-regexp` v8 which throws `PathError: Missing parameter name` when registering `app.get('*')`, causing an immediate uncaught exception on startup.
+- **Solution**: Replaced `app.get('*')` with `app.use((req, res, next) => ...)` to safely handle SPA fallback routing.
+
+### 5. Dynamic Cloud Port & Database URL Binding
+- **Problem**: Prisma Compute assigns dynamic container ports and database connection strings at runtime (`COMPOSER_*_PORT`, `COMPOSER_*_DB_URL`).
+- **Solution**: Added multi-layer fallbacks in `src/index.ts` (listening on `0.0.0.0` with dynamic port) and `src/config/db.ts`.
+
+### 6. Database Migration Requirement for Prisma Cloud
+- **Problem**: Deploy pipeline failed with `MIGRATION_PATH_NOT_FOUND` because cloud deployment requires authored migration files to provision a clean database.
+- **Solution**: Executed `prisma migration plan --name init` and committed baseline migrations under `migrations/app/20260831T1258_baseline/`.
+
+### 7. Local Testing Suite to Prevent Deploy Spam
+- **Problem**: Deploying each small fix to GitHub Actions took time and created unnecessary commits.
+- **Solution**: Created `test/smoke.test.js` and added `npm test`. In 3 seconds, it validates the build, launches the bundled server in a background process, tests `/api/health`, `/`, `/metrics`, and SPA fallback, and shuts down cleanly.
