@@ -5,13 +5,16 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "prisma contract emit && npm run build --prefix frontend && esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --banner:js=\"import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);\" --outfile=dist/index.js && node copy-frontend.js",
+    "test": "npm run build && node --test test/smoke.test.js",
+    "test:smoke": "node --test test/smoke.test.js",
     "contract:emit": "prisma contract emit",
     "db:init": "prisma db init",
     "db:update": "prisma db update",
     "db:migrate": "prisma db migrate",
-    "seed": "tsx prisma/seed.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "seed": "tsx prisma/seed.ts"
   },
   "repository": {
     "type": "git",
