@@ -18,7 +18,30 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 };
 
 export const createApplication = async (req: Request, res: Response): Promise<void> => {
-  const { applicantName, type, priority, description, serviceCatalogId } = req.body;
+  const {
+    applicantName,
+    type,
+    priority,
+    description,
+    serviceCatalogId,
+    formType,
+    subtype,
+    payload,
+    requesterEmail,
+    bv,
+    r,
+    tc,
+    aw,
+    effort,
+    wsjf,
+    impact,
+    urgency,
+    severity,
+    computedPriority,
+    pocId,
+    dueDate,
+    clickupTaskId,
+  } = req.body;
   const hours = SLA_HOURS[priority] ?? 72;
   const slaDeadline = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 
@@ -30,6 +53,23 @@ export const createApplication = async (req: Request, res: Response): Promise<vo
       description,
       slaDeadline,
       serviceCatalogId: serviceCatalogId ?? null,
+      formType: formType ?? null,
+      subtype: subtype ?? null,
+      payload: payload ?? null,
+      requesterEmail: requesterEmail ?? null,
+      bv: bv ?? null,
+      r: r ?? null,
+      tc: tc ?? null,
+      aw: aw ?? null,
+      effort: effort ?? null,
+      wsjf: wsjf ?? null,
+      impact: impact ?? null,
+      urgency: urgency ?? null,
+      severity: severity ?? null,
+      computedPriority: computedPriority ?? null,
+      pocId: pocId ?? null,
+      dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+      clickupTaskId: clickupTaskId ?? null,
     });
     res.status(201).json(application);
   } catch {
@@ -40,6 +80,23 @@ export const createApplication = async (req: Request, res: Response): Promise<vo
       description,
       slaDeadline,
       serviceCatalogId,
+      formType,
+      subtype,
+      payload,
+      requesterEmail,
+      bv,
+      r,
+      tc,
+      aw,
+      effort,
+      wsjf,
+      impact,
+      urgency,
+      severity,
+      computedPriority,
+      pocId,
+      dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+      clickupTaskId,
     });
     res.status(201).json(application);
   }

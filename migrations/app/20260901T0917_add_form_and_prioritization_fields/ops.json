@@ -1,0 +1,716 @@
+[
+  {
+    "id": "column.public.application.aw",
+    "label": "Add column \"aw\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "aw",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"aw\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "aw"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"aw\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"aw\" float8"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"aw\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "aw"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.bv",
+    "label": "Add column \"bv\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "bv",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"bv\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "bv"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"bv\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"bv\" float8"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"bv\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "bv"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.clickupTaskId",
+    "label": "Add column \"clickupTaskId\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "clickupTaskId",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"clickupTaskId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "clickupTaskId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"clickupTaskId\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"clickupTaskId\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"clickupTaskId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "clickupTaskId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.computedPriority",
+    "label": "Add column \"computedPriority\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "computedPriority",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"computedPriority\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "computedPriority"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"computedPriority\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"computedPriority\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"computedPriority\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "computedPriority"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.dueDate",
+    "label": "Add column \"dueDate\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "dueDate",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"dueDate\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "dueDate"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"dueDate\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"dueDate\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"dueDate\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "dueDate"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.effort",
+    "label": "Add column \"effort\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "effort",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"effort\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "effort"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"effort\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"effort\" float8"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"effort\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "effort"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.formType",
+    "label": "Add column \"formType\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "formType",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"formType\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "formType"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"formType\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"formType\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"formType\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "formType"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.impact",
+    "label": "Add column \"impact\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "impact",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"impact\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "impact"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"impact\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"impact\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"impact\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "impact"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.payload",
+    "label": "Add column \"payload\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "payload",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"payload\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "payload"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"payload\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"payload\" json"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"payload\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "payload"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.pocId",
+    "label": "Add column \"pocId\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "pocId",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"pocId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "pocId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"pocId\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"pocId\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"pocId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "pocId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.r",
+    "label": "Add column \"r\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "r",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"r\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "r"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"r\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"r\" float8"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"r\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "r"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.requesterEmail",
+    "label": "Add column \"requesterEmail\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "requesterEmail",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"requesterEmail\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "requesterEmail"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"requesterEmail\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"requesterEmail\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"requesterEmail\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "requesterEmail"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.severity",
+    "label": "Add column \"severity\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "severity",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"severity\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "severity"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"severity\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"severity\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"severity\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "severity"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.subtype",
+    "label": "Add column \"subtype\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "subtype",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"subtype\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "subtype"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"subtype\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"subtype\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"subtype\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "subtype"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.tc",
+    "label": "Add column \"tc\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "tc",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"tc\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "tc"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"tc\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"tc\" float8"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"tc\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "tc"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.urgency",
+    "label": "Add column \"urgency\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "urgency",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"urgency\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "urgency"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"urgency\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"urgency\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"urgency\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "urgency"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.public.application.wsjf",
+    "label": "Add column \"wsjf\" to \"application\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "wsjf",
+        "table": "application"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"wsjf\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "wsjf"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"wsjf\"",
+        "sql": "ALTER TABLE \"public\".\"application\" ADD COLUMN \"wsjf\" float8"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"wsjf\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "public",
+          "application",
+          "wsjf"
+        ]
+      }
+    ]
+  }
+]

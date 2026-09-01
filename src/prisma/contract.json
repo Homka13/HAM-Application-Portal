@@ -49,7 +49,35 @@
                   "kind": "scalar"
                 }
               },
+              "aw": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
+              "bv": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
               "changeRequestId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "clickupTaskId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "computedPriority": {
                 "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
@@ -70,8 +98,50 @@
                   "kind": "scalar"
                 }
               },
+              "dueDate": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "effort": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
+              "formType": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "impact": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "payload": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/json@1",
+                  "kind": "scalar"
+                }
+              },
+              "pocId": {
+                "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -91,7 +161,28 @@
                   "kind": "scalar"
                 }
               },
+              "r": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
+              "requesterEmail": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "serviceCatalogId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "severity": {
                 "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
@@ -112,10 +203,38 @@
                   "kind": "scalar"
                 }
               },
+              "subtype": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "tc": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
               "type": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "urgency": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "wsjf": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/float8@1",
                   "kind": "scalar"
                 }
               }
@@ -190,8 +309,20 @@
                 "assignee": {
                   "column": "assignee"
                 },
+                "aw": {
+                  "column": "aw"
+                },
+                "bv": {
+                  "column": "bv"
+                },
                 "changeRequestId": {
                   "column": "changeRequestId"
+                },
+                "clickupTaskId": {
+                  "column": "clickupTaskId"
+                },
+                "computedPriority": {
+                  "column": "computedPriority"
                 },
                 "createdAt": {
                   "column": "createdAt"
@@ -199,8 +330,26 @@
                 "description": {
                   "column": "description"
                 },
+                "dueDate": {
+                  "column": "dueDate"
+                },
+                "effort": {
+                  "column": "effort"
+                },
+                "formType": {
+                  "column": "formType"
+                },
                 "id": {
                   "column": "id"
+                },
+                "impact": {
+                  "column": "impact"
+                },
+                "payload": {
+                  "column": "payload"
+                },
+                "pocId": {
+                  "column": "pocId"
                 },
                 "priority": {
                   "column": "priority"
@@ -208,8 +357,17 @@
                 "problemId": {
                   "column": "problemId"
                 },
+                "r": {
+                  "column": "r"
+                },
+                "requesterEmail": {
+                  "column": "requesterEmail"
+                },
                 "serviceCatalogId": {
                   "column": "serviceCatalogId"
+                },
+                "severity": {
+                  "column": "severity"
                 },
                 "slaDeadline": {
                   "column": "slaDeadline"
@@ -217,8 +375,20 @@
                 "status": {
                   "column": "status"
                 },
+                "subtype": {
+                  "column": "subtype"
+                },
+                "tc": {
+                  "column": "tc"
+                },
                 "type": {
                   "column": "type"
+                },
+                "urgency": {
+                  "column": "urgency"
+                },
+                "wsjf": {
+                  "column": "wsjf"
                 }
               },
               "namespaceId": "public",
@@ -756,7 +926,27 @@
                   "nativeType": "text",
                   "nullable": true
                 },
+                "aw": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": true
+                },
+                "bv": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": true
+                },
                 "changeRequestId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "clickupTaskId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "computedPriority": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
@@ -775,10 +965,40 @@
                   "nativeType": "text",
                   "nullable": true
                 },
+                "dueDate": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "effort": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": true
+                },
+                "formType": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
+                },
+                "impact": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "payload": {
+                  "codecId": "pg/json@1",
+                  "nativeType": "json",
+                  "nullable": true
+                },
+                "pocId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 },
                 "priority": {
                   "codecId": "pg/text@1",
@@ -794,7 +1014,22 @@
                   "nativeType": "text",
                   "nullable": true
                 },
+                "r": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": true
+                },
+                "requesterEmail": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "serviceCatalogId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "severity": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
@@ -813,6 +1048,16 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "subtype": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "tc": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": true
+                },
                 "type": {
                   "codecId": "pg/text@1",
                   "default": {
@@ -821,6 +1066,16 @@
                   },
                   "nativeType": "text",
                   "nullable": false
+                },
+                "urgency": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "wsjf": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": true
                 }
               },
               "foreignKeys": [
@@ -1252,7 +1507,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "aa44ed27835cc6dd03974f524782f8b7f8a811edbab04372b0ea61dbd9b0f87d"
+    "storageHash": "02e0520c5c2821e57e5b90640d677ce34c72e5e516356b428323e7d3d5ee828c"
   },
   "execution": {
     "executionHash": "0d33bc16dda0cd2b1e0d3433686c069ffa80195761ebfa8754198f2b2813f7b3",

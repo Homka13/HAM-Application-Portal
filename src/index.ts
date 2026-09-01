@@ -183,18 +183,23 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/livez', (req, res) => res.json({ status: 'ok' }));
 app.get('/readyz', (req, res) => res.json({ status: 'ok' }));
 
-const server = app.listen(Number(PORT), () => {
-  console.log(`Server running on port ${PORT}`);
-  try {
-    initSlaEscalation();
-  } catch (err) {
-    console.error('Failed to init SLA escalation:', err);
-  }
-});
+const isTest = process.env.NODE_ENV === 'test' || process.argv.some((a) => a.includes('test'));
 
-server.on('error', (err) => {
-  console.error('HTTP Server Error:', err);
-});
+let server: any = null;
+if (!isTest) {
+  server = app.listen(Number(PORT), () => {
+    console.log(`Server running on port ${PORT}`);
+    try {
+      initSlaEscalation();
+    } catch (err) {
+      console.error('Failed to init SLA escalation:', err);
+    }
+  });
+
+  server.on('error', (err: any) => {
+    console.error('HTTP Server Error:', err);
+  });
+}
 
 export default app;
 

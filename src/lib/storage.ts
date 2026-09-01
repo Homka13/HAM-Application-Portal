@@ -23,6 +23,25 @@ export interface LocalApplication {
   problemId?: string | null;
   createdAt: string;
   updatedAt: string;
+
+  // Extended form and prioritization fields
+  formType?: string | null;
+  subtype?: string | null;
+  payload?: any;
+  requesterEmail?: string | null;
+  bv?: number | null;
+  r?: number | null;
+  tc?: number | null;
+  aw?: number | null;
+  effort?: number | null;
+  wsjf?: number | null;
+  impact?: string | null;
+  urgency?: string | null;
+  severity?: string | null;
+  computedPriority?: string | null;
+  pocId?: string | null;
+  dueDate?: string | null;
+  clickupTaskId?: string | null;
 }
 
 export interface LocalAuditLog {
@@ -169,9 +188,26 @@ export const localStore = {
     applicantName: string;
     type: string;
     priority: string;
-    description: string | null;
+    description?: string | null;
     slaDeadline: string;
     serviceCatalogId?: string | null;
+    formType?: string | null;
+    subtype?: string | null;
+    payload?: any;
+    requesterEmail?: string | null;
+    bv?: number | null;
+    r?: number | null;
+    tc?: number | null;
+    aw?: number | null;
+    effort?: number | null;
+    wsjf?: number | null;
+    impact?: string | null;
+    urgency?: string | null;
+    severity?: string | null;
+    computedPriority?: string | null;
+    pocId?: string | null;
+    dueDate?: string | null;
+    clickupTaskId?: string | null;
   }): LocalApplication {
     const db = loadDb();
     const newApp: LocalApplication = {
@@ -180,13 +216,30 @@ export const localStore = {
       type: data.type,
       priority: data.priority,
       status: 'NEW',
-      description: data.description,
+      description: data.description || null,
       assignee: null,
       slaDeadline: data.slaDeadline,
       serviceCatalogId: data.serviceCatalogId || null,
       problemId: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      formType: data.formType || null,
+      subtype: data.subtype || null,
+      payload: data.payload || null,
+      requesterEmail: data.requesterEmail || null,
+      bv: data.bv ?? null,
+      r: data.r ?? null,
+      tc: data.tc ?? null,
+      aw: data.aw ?? null,
+      effort: data.effort ?? null,
+      wsjf: data.wsjf ?? null,
+      impact: data.impact || null,
+      urgency: data.urgency || null,
+      severity: data.severity || null,
+      computedPriority: data.computedPriority || null,
+      pocId: data.pocId || null,
+      dueDate: data.dueDate || null,
+      clickupTaskId: data.clickupTaskId || null,
     };
     db.applications.push(newApp);
     saveDb(db);
