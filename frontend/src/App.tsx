@@ -11,6 +11,7 @@ interface ServiceCatalog {
   name: string;
   category: string;
   description: string | null;
+  defaultType?: string;
 }
 
 interface Application {
@@ -186,11 +187,57 @@ function App() {
     fetchServices();
   }, []);
 
+  const visibleServices = useMemo(() => {
+    return services.filter((svc) => {
+      const isIncident =
+        svc.name === 'Зупинка виробництва' ||
+        svc.defaultType === 'INCIDENT' ||
+        svc.category.toLowerCase().includes('інцидент') ||
+        svc.category.toLowerCase().includes('incident');
+      return type === 'INCIDENT' ? isIncident : !isIncident;
+    });
+  }, [services, type]);
+
+  const handleTypeChange = (newType: string) => {
+    setType(newType);
+    if (newType === 'INCIDENT') {
+      setPriority('CRITICAL');
+      const incSvc = services.find(
+        (s) =>
+          s.name === 'Зупинка виробництва' ||
+          s.defaultType === 'INCIDENT' ||
+          s.category.toLowerCase().includes('інцидент') ||
+          s.category.toLowerCase().includes('incident')
+      );
+      if (incSvc) {
+        setServiceCatalogId(incSvc.id);
+      } else {
+        setServiceCatalogId('');
+      }
+    } else {
+      if (priority === 'CRITICAL') setPriority('LOW');
+      const curSvc = services.find((s) => s.id === serviceCatalogId);
+      const isCurInc =
+        curSvc?.name === 'Зупинка виробництва' ||
+        curSvc?.defaultType === 'INCIDENT' ||
+        curSvc?.category.toLowerCase().includes('інцидент') ||
+        curSvc?.category.toLowerCase().includes('incident');
+      if (isCurInc) {
+        setServiceCatalogId('');
+      }
+    }
+  };
+
   const handleServiceSelect = (serviceId: string) => {
     setServiceCatalogId(serviceId);
     const selected = services.find((s) => s.id === serviceId);
     if (selected) {
-      if (selected.name === 'Зупинка виробництва' || selected.category === 'Critical Incident') {
+      const isIncident =
+        selected.name === 'Зупинка виробництва' ||
+        selected.defaultType === 'INCIDENT' ||
+        selected.category.toLowerCase().includes('інцидент') ||
+        selected.category.toLowerCase().includes('incident');
+      if (isIncident) {
         setType('INCIDENT');
         setPriority('CRITICAL');
       } else {
@@ -328,7 +375,7 @@ function App() {
               </label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value)}
+                onChange={(e) => handleTypeChange(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="SERVICE_REQUEST">Запит на обслуговування</option>
@@ -363,7 +410,7 @@ function App() {
             >
               <option value="">— Оберіть сервіс —</option>
               {(() => {
-                const grouped = services.reduce<Record<string, ServiceCatalog[]>>(
+                const grouped = visibleServices.reduce<Record<string, ServiceCatalog[]>>(
                   (acc, svc) => {
                     (acc[svc.category] ||= []).push(svc);
                     return acc;

@@ -54,7 +54,7 @@ describe('Integration Tests: HAM Portal REST API', () => {
           type: 'INCIDENT',
           priority: 'HIGH',
           description: 'Проблема з принтером у кабінеті 204',
-          serviceCatalogId: 'srv-5',
+          serviceCatalogId: 'srv-4',
         });
 
       assert.equal(res.status, 201);
@@ -340,11 +340,11 @@ describe('Integration Tests: HAM Portal REST API', () => {
   });
 
   describe('3. Services Catalog API (/api/services)', () => {
-    it('GET /api/services returns all catalog services including Power BI, Номенклатура, Зупинка виробництва', async () => {
+    it('GET /api/services returns exactly the 4 configured catalog services', async () => {
       const res = await request(app).get('/api/services');
       assert.equal(res.status, 200);
       assert.ok(Array.isArray(res.body));
-      assert.ok(res.body.length >= 9);
+      assert.equal(res.body.length, 4);
 
       const names = res.body.map((s) => s.name);
       assert.ok(names.includes('Створення звіт павер бі'));
@@ -353,24 +353,24 @@ describe('Integration Tests: HAM Portal REST API', () => {
       assert.ok(names.includes('Зупинка виробництва'));
     });
 
-    it('Synchronizes type with service: «Зупинка виробництва» -> INCIDENT', async () => {
+    it('Synchronizes type with service: «Зупинка виробництва» (srv-4) -> INCIDENT', async () => {
       const res = await request(app)
         .post('/api/applications')
         .send({
           applicantName: 'Цех №3',
-          serviceCatalogId: 'srv-9',
+          serviceCatalogId: 'srv-4',
           description: 'Зупинка головного конвеєра',
         });
       assert.equal(res.status, 201);
       assert.equal(res.body.type, 'INCIDENT');
     });
 
-    it('Synchronizes type with service: «Створення звіт павер бі» -> SERVICE_REQUEST', async () => {
+    it('Synchronizes type with service: «Створення звіт павер бі» (srv-1) -> SERVICE_REQUEST', async () => {
       const res = await request(app)
         .post('/api/applications')
         .send({
           applicantName: 'Аналітик Денис',
-          serviceCatalogId: 'srv-6',
+          serviceCatalogId: 'srv-1',
           description: 'Звіт з продажів за серпень',
         });
       assert.equal(res.status, 201);

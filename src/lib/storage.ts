@@ -102,32 +102,27 @@ interface LocalDatabase {
 }
 
 const DEFAULT_SERVICES: LocalService[] = [
-  { id: 'srv-1', name: 'Налаштування робочого місця', category: 'IT Support', description: 'Підготовка та налаштування ПК/ноутбука', defaultType: 'SERVICE_REQUEST' },
-  { id: 'srv-2', name: 'Доступ до VPN', category: 'Security', description: 'Надання віддаленого доступу до корпоративної мережі', defaultType: 'SERVICE_REQUEST' },
-  { id: 'srv-3', name: 'Встановлення програмного забезпечення', category: 'Software', description: 'Встановлення ліцензійного ПЗ', defaultType: 'SERVICE_REQUEST' },
-  { id: 'srv-4', name: 'Пошта та облікові записи', category: 'Access', description: 'Скидання пароля, створення поштової скриньки', defaultType: 'SERVICE_REQUEST' },
-  { id: 'srv-5', name: 'Обслуговування оргтехніки', category: 'Hardware', description: 'Принтери, сканери, монітори', defaultType: 'SERVICE_REQUEST' },
-  { id: 'srv-6', name: 'Створення звіт павер бі', category: 'Analytics / Power BI', description: 'Створення або доопрацювання аналітичного звіту в Power BI', defaultType: 'SERVICE_REQUEST' },
-  { id: 'srv-7', name: 'Отримання доступу до павер бі', category: 'Access / Power BI', description: 'Надання доступу до звітів або робочої області Power BI', defaultType: 'SERVICE_REQUEST' },
-  { id: 'srv-8', name: 'Створення заявки на номенклатуру', category: 'Master Data / ERP', description: 'Заведення нової товарної номенклатури або довідника', defaultType: 'SERVICE_REQUEST' },
-  { id: 'srv-9', name: 'Зупинка виробництва', category: 'Critical Incident', description: 'Аварійна зупинка виробничого процесу / лінії', defaultType: 'INCIDENT' },
+  { id: 'srv-1', name: 'Створення звіт павер бі', category: 'Power BI', description: 'Створення або доопрацювання аналітичного звіту в Power BI', defaultType: 'SERVICE_REQUEST' },
+  { id: 'srv-2', name: 'Отримання доступу до павер бі', category: 'Power BI', description: 'Надання доступу до звітів або робочої області Power BI', defaultType: 'SERVICE_REQUEST' },
+  { id: 'srv-3', name: 'Створення заявки на номенклатуру', category: 'ERP / Номенклатура', description: 'Заведення нової товарної номенклатури або довідника в ERP', defaultType: 'SERVICE_REQUEST' },
+  { id: 'srv-4', name: 'Зупинка виробництва', category: 'Виробництво / Інциденти', description: 'Аварійна зупинка виробничого процесу / технологічної лінії', defaultType: 'INCIDENT' },
 ];
 
 const DEFAULT_ARTICLES: LocalArticle[] = [
   {
     id: 'art-1',
-    title: 'Інструкція з підключення до VPN',
-    content: '1. Завантажте клієнт Cisco AnyConnect.\n2. Введіть адресу vpn.company.local.\n3. Використовуйте корпоративний логін та пароль.',
-    category: 'VPN',
+    title: 'Інструкція з роботи з Power BI',
+    content: '1. Перейдіть на app.powerbi.com.\n2. Увійдіть через корпоративний логін.\n3. Оберіть робочу область вашого підрозділу.',
+    category: 'Power BI',
     status: 'PUBLISHED',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
   {
     id: 'art-2',
-    title: 'Скидання пароля до облікового запису',
-    content: 'Для скидання пароля перейдіть на portal.company.local/reset або зверніться до чергового адміністратора.',
-    category: 'Access',
+    title: 'Регламент дій при зупинці виробництва',
+    content: '1. Негайно зафіксуйте час зупинки та повідомте чергового диспетчера.\n2. Створіть інцидент у HAM Portal із пріоритетом Критичний.',
+    category: 'Інциденти',
     status: 'PUBLISHED',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -140,15 +135,8 @@ function loadDb(): LocalDatabase {
   try {
     if (fs.existsSync(DB_FILE)) {
       const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
-      const existingServices: LocalService[] = Array.isArray(data.services) ? data.services : [];
-      const existingIds = new Set(existingServices.map((s) => s.id));
-      const mergedServices = [
-        ...existingServices,
-        ...DEFAULT_SERVICES.filter((s) => !existingIds.has(s.id)),
-      ];
-
       return {
-        services: mergedServices.length ? mergedServices : DEFAULT_SERVICES,
+        services: DEFAULT_SERVICES,
         applications: data.applications || [],
         auditLogs: data.auditLogs || [],
         changes: data.changes || [],
