@@ -51,22 +51,61 @@ const TYPE_LABELS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   NEW: 'Новий',
+  TZ_PREPARATION: 'Підготовка ТЗ',
+  PENDING_APPROVAL: 'Очікує погодження',
+  APPROVED: 'Погоджено',
+  TRIAGE: 'Тріаж',
+  ESTIMATION: 'Оцінка / WSJF',
   IN_PROGRESS: 'В роботі',
+  TESTING: 'Тестування',
+  UAT: 'Приймальне тестування (UAT)',
   RESOLVED: 'Вирішено',
   CLOSED: 'Закрито',
+  REJECTED: 'Відхилено',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  NEW: 'bg-blue-100 text-blue-800',
+  TZ_PREPARATION: 'bg-purple-100 text-purple-800',
+  PENDING_APPROVAL: 'bg-amber-100 text-amber-800',
+  APPROVED: 'bg-emerald-100 text-emerald-800',
+  TRIAGE: 'bg-orange-100 text-orange-800',
+  ESTIMATION: 'bg-indigo-100 text-indigo-800',
+  IN_PROGRESS: 'bg-cyan-100 text-cyan-800',
+  TESTING: 'bg-violet-100 text-violet-800',
+  UAT: 'bg-teal-100 text-teal-800',
+  RESOLVED: 'bg-green-100 text-green-800',
+  CLOSED: 'bg-gray-100 text-gray-700',
+  REJECTED: 'bg-red-100 text-red-800',
 };
 
 const NEXT_STATUS: Record<string, string[]> = {
-  NEW: ['IN_PROGRESS', 'CLOSED'],
-  IN_PROGRESS: ['RESOLVED', 'CLOSED'],
+  NEW: ['TZ_PREPARATION', 'PENDING_APPROVAL', 'TRIAGE', 'IN_PROGRESS', 'REJECTED'],
+  TZ_PREPARATION: ['ESTIMATION', 'TZ_PREPARATION', 'REJECTED'],
+  PENDING_APPROVAL: ['APPROVED', 'REJECTED'],
+  APPROVED: ['IN_PROGRESS', 'RESOLVED'],
+  TRIAGE: ['IN_PROGRESS', 'RESOLVED', 'REJECTED'],
+  ESTIMATION: ['IN_PROGRESS', 'TZ_PREPARATION', 'REJECTED'],
+  IN_PROGRESS: ['TESTING', 'UAT', 'RESOLVED', 'TZ_PREPARATION', 'REJECTED'],
+  TESTING: ['UAT', 'IN_PROGRESS'],
+  UAT: ['RESOLVED', 'TZ_PREPARATION', 'IN_PROGRESS'],
   RESOLVED: ['CLOSED', 'IN_PROGRESS'],
   CLOSED: [],
+  REJECTED: ['NEW', 'TZ_PREPARATION', 'PENDING_APPROVAL'],
 };
 
 const STATUS_ACTION_LABELS: Record<string, string> = {
+  TZ_PREPARATION: 'ТЗ / Уточнення',
+  PENDING_APPROVAL: 'На погодження',
+  APPROVED: 'Погодити',
+  TRIAGE: 'На тріаж',
+  ESTIMATION: 'На оцінку',
   IN_PROGRESS: 'В роботу',
+  TESTING: 'На тестування',
+  UAT: 'На UAT',
   RESOLVED: 'Вирішити',
   CLOSED: 'Закрити',
+  REJECTED: 'Відхилити',
 };
 
 function App() {
@@ -146,6 +185,22 @@ function App() {
     fetchApplications();
     fetchServices();
   }, []);
+
+  const handleServiceSelect = (serviceId: string) => {
+    setServiceCatalogId(serviceId);
+    const selected = services.find((s) => s.id === serviceId);
+    if (selected) {
+      if (selected.name === 'Зупинка виробництва' || selected.category === 'Critical Incident') {
+        setType('INCIDENT');
+        setPriority('CRITICAL');
+      } else {
+        setType('SERVICE_REQUEST');
+        if (priority === 'CRITICAL') {
+          setPriority('LOW');
+        }
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -303,7 +358,7 @@ function App() {
             </label>
             <select
               value={serviceCatalogId}
-              onChange={(e) => setServiceCatalogId(e.target.value)}
+              onChange={(e) => handleServiceSelect(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">— Оберіть сервіс —</option>
@@ -454,7 +509,11 @@ function App() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            STATUS_COLORS[app.status] || 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
                           {STATUS_LABELS[app.status] || app.status}
                         </span>
                       </td>
@@ -480,32 +539,27 @@ function App() {
                     {isExpanded && (
                       <tr>
                         <td colSpan={7} className="px-6 bg-gray-50 border-b">
-                          {role === 'ADMIN' &&
-                            NEXT_STATUS[app.status]?.length > 0 && (
-                              <div className="flex items-center gap-2 py-3 border-b border-gray-200">
-                                <span className="text-xs text-gray-500 mr-2">
-                                  Дії:
-                                </span>
-                                {NEXT_STATUS[app.status].map((next) => (
-                                  <button
-                                    key={next}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStatusChange(app.id, next);
-                                    }}
-                                    className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                                      next === 'CLOSED'
-                                        ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                        : next === 'IN_PROGRESS'
-                                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                                        : 'bg-green-100 text-green-700 hover:bg-green-200'
-                                    }`}
-                                  >
-                                    {STATUS_ACTION_LABELS[next] || next}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
+                          {NEXT_STATUS[app.status]?.length > 0 && (
+                            <div className="flex items-center flex-wrap gap-2 py-3 border-b border-gray-200">
+                              <span className="text-xs text-gray-500 mr-2">
+                                Змінити статус:
+                              </span>
+                              {NEXT_STATUS[app.status].map((next) => (
+                                <button
+                                  key={next}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStatusChange(app.id, next);
+                                  }}
+                                  className={`px-3 py-1 text-xs font-medium rounded-full transition-colors border shadow-sm ${
+                                    STATUS_COLORS[next] || 'bg-gray-100 text-gray-700'
+                                  } hover:opacity-80`}
+                                >
+                                  {STATUS_ACTION_LABELS[next] || next}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                           <AuditTimeline appId={app.id} />
                         </td>
                       </tr>

@@ -7,6 +7,7 @@ export interface LocalService {
   name: string;
   category: string;
   description: string | null;
+  defaultType?: 'SERVICE_REQUEST' | 'INCIDENT';
 }
 
 export interface LocalApplication {
@@ -101,11 +102,15 @@ interface LocalDatabase {
 }
 
 const DEFAULT_SERVICES: LocalService[] = [
-  { id: 'srv-1', name: 'Налаштування робочого місця', category: 'IT Support', description: 'Підготовка та налаштування ПК/ноутбука' },
-  { id: 'srv-2', name: 'Доступ до VPN', category: 'Security', description: 'Надання віддаленого доступу до корпоративної мережі' },
-  { id: 'srv-3', name: 'Встановлення програмного забезпечення', category: 'Software', description: 'Встановлення ліцензійного ПЗ' },
-  { id: 'srv-4', name: 'Пошта та облікові записи', category: 'Access', description: 'Скидання пароля, створення поштової скриньки' },
-  { id: 'srv-5', name: 'Обслуговування оргтехніки', category: 'Hardware', description: 'Принтери, сканери, монітори' },
+  { id: 'srv-1', name: 'Налаштування робочого місця', category: 'IT Support', description: 'Підготовка та налаштування ПК/ноутбука', defaultType: 'SERVICE_REQUEST' },
+  { id: 'srv-2', name: 'Доступ до VPN', category: 'Security', description: 'Надання віддаленого доступу до корпоративної мережі', defaultType: 'SERVICE_REQUEST' },
+  { id: 'srv-3', name: 'Встановлення програмного забезпечення', category: 'Software', description: 'Встановлення ліцензійного ПЗ', defaultType: 'SERVICE_REQUEST' },
+  { id: 'srv-4', name: 'Пошта та облікові записи', category: 'Access', description: 'Скидання пароля, створення поштової скриньки', defaultType: 'SERVICE_REQUEST' },
+  { id: 'srv-5', name: 'Обслуговування оргтехніки', category: 'Hardware', description: 'Принтери, сканери, монітори', defaultType: 'SERVICE_REQUEST' },
+  { id: 'srv-6', name: 'Створення звіт павер бі', category: 'Analytics / Power BI', description: 'Створення або доопрацювання аналітичного звіту в Power BI', defaultType: 'SERVICE_REQUEST' },
+  { id: 'srv-7', name: 'Отримання доступу до павер бі', category: 'Access / Power BI', description: 'Надання доступу до звітів або робочої області Power BI', defaultType: 'SERVICE_REQUEST' },
+  { id: 'srv-8', name: 'Створення заявки на номенклатуру', category: 'Master Data / ERP', description: 'Заведення нової товарної номенклатури або довідника', defaultType: 'SERVICE_REQUEST' },
+  { id: 'srv-9', name: 'Зупинка виробництва', category: 'Critical Incident', description: 'Аварійна зупинка виробничого процесу / лінії', defaultType: 'INCIDENT' },
 ];
 
 const DEFAULT_ARTICLES: LocalArticle[] = [
@@ -135,8 +140,15 @@ function loadDb(): LocalDatabase {
   try {
     if (fs.existsSync(DB_FILE)) {
       const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+      const existingServices: LocalService[] = Array.isArray(data.services) ? data.services : [];
+      const existingIds = new Set(existingServices.map((s) => s.id));
+      const mergedServices = [
+        ...existingServices,
+        ...DEFAULT_SERVICES.filter((s) => !existingIds.has(s.id)),
+      ];
+
       return {
-        services: data.services?.length ? data.services : DEFAULT_SERVICES,
+        services: mergedServices.length ? mergedServices : DEFAULT_SERVICES,
         applications: data.applications || [],
         auditLogs: data.auditLogs || [],
         changes: data.changes || [],

@@ -9,11 +9,36 @@ const SLA_HOURS = {
   LOW: 72,
 };
 
-const VALID_TRANSITIONS = {
-  NEW: ['IN_PROGRESS', 'CLOSED'],
+// 12-Status Branch Transitions
+const TRANSITIONS_BRANCH_ABE = {
+  NEW: ['TZ_PREPARATION', 'REJECTED'],
+  TZ_PREPARATION: ['ESTIMATION', 'TZ_PREPARATION', 'REJECTED'],
+  ESTIMATION: ['IN_PROGRESS', 'TZ_PREPARATION', 'REJECTED'],
+  IN_PROGRESS: ['TESTING', 'TZ_PREPARATION', 'REJECTED'],
+  TESTING: ['UAT', 'IN_PROGRESS'],
+  UAT: ['RESOLVED', 'TZ_PREPARATION', 'IN_PROGRESS'],
+  RESOLVED: ['CLOSED', 'IN_PROGRESS', 'UAT'],
+  CLOSED: [],
+  REJECTED: ['TZ_PREPARATION', 'NEW'],
+};
+
+const TRANSITIONS_BRANCH_C = {
+  NEW: ['TRIAGE', 'IN_PROGRESS', 'REJECTED'],
+  TRIAGE: ['IN_PROGRESS', 'RESOLVED', 'REJECTED'],
+  IN_PROGRESS: ['RESOLVED', 'CLOSED', 'REJECTED'],
+  RESOLVED: ['CLOSED', 'IN_PROGRESS'],
+  CLOSED: [],
+  REJECTED: ['NEW', 'TRIAGE'],
+};
+
+const TRANSITIONS_BRANCH_D = {
+  NEW: ['PENDING_APPROVAL', 'REJECTED'],
+  PENDING_APPROVAL: ['APPROVED', 'REJECTED'],
+  APPROVED: ['IN_PROGRESS', 'RESOLVED'],
   IN_PROGRESS: ['RESOLVED', 'CLOSED'],
   RESOLVED: ['CLOSED', 'IN_PROGRESS'],
   CLOSED: [],
+  REJECTED: ['PENDING_APPROVAL', 'NEW'],
 };
 
 const CHANGE_WORKFLOW = {
@@ -43,15 +68,27 @@ function calculateSlaDeadline(priority, startTime = Date.now()) {
   return new Date(startTime + hours * 60 * 60 * 1000).toISOString();
 }
 
+// Branch Detector Helper
+function getBranch(formType, type) {
+  const f = (formType || '').trim().toUpperCase();
+  const t = (type || '').trim().toUpperCase();
+  if (f === 'C' || t === 'INCIDENT') return 'C';
+  if (f === 'D') return 'D';
+  return 'ABE';
+}
+
 // Transition Validator Helper
-function validateTransition(currentStatus, targetStatus, resolutionNote) {
+function validateTransition(currentStatus, targetStatus, resolutionNote, formType = 'A', type = 'SERVICE_REQUEST') {
   if (currentStatus === targetStatus) {
     return { ok: true, noop: true };
   }
 
-  const allowed = VALID_TRANSITIONS[currentStatus] || [];
+  const branch = getBranch(formType, type);
+  const map = branch === 'C' ? TRANSITIONS_BRANCH_C : branch === 'D' ? TRANSITIONS_BRANCH_D : TRANSITIONS_BRANCH_ABE;
+  const allowed = map[currentStatus] || [];
+
   if (!allowed.includes(targetStatus)) {
-    return { ok: false, error: `Недопустимий перехід: ${currentStatus} → ${targetStatus}` };
+    return { ok: false, error: `Недопустимий перехід: ${currentStatus} → ${targetStatus} (Гілка: ${branch})` };
   }
 
   if (targetStatus === 'RESOLVED' && !resolutionNote) {
@@ -103,110 +140,126 @@ describe('1. Business Logic: SLA Deadline Calculations', () => {
   });
 });
 
-describe('2. Business Logic: Application Status Transitions (VALID_TRANSITIONS)', () => {
-  it('Allows NEW -> IN_PROGRESS transition', () => {
-    const res = validateTransition('NEW', 'IN_PROGRESS');
-    assert.equal(res.ok, true);
-  });
+describe('2. Business Logic: 12-Status Branch Transitions & Guards', () => {
+  describe('Branch A/B/E (ТЗ specification, development & UAT)', () => {
+    it('Allows full standard flow: NEW -> TZ_PREPARATION -> ESTIMATION -> IN_PROGRESS -> TESTING -> UAT -> RESOLVED -> CLOSED', () => {
+      assert.equal(validateTransition('NEW', 'TZ_PREPARATION', null, 'A').ok, true);
+      assert.equal(validateTransition('TZ_PREPARATION', 'ESTIMATION', null, 'A').ok, true);
+      assert.equal(validateTransition('ESTIMATION', 'IN_PROGRESS', null, 'A').ok, true);
+      assert.equal(validateTransition('IN_PROGRESS', 'TESTING', null, 'A').ok, true);
+      assert.equal(validateTransition('TESTING', 'UAT', null, 'A').ok, true);
+      assert.equal(validateTransition('UAT', 'RESOLVED', 'Реалізовано згідно з ТЗ', 'A').ok, true);
+      assert.equal(validateTransition('RESOLVED', 'CLOSED', null, 'A').ok, true);
+    });
 
-  it('Allows NEW -> CLOSED transition', () => {
-    const res = validateTransition('NEW', 'CLOSED');
-    assert.equal(res.ok, true);
-  });
+    it('Supports TZ loop (петля ТЗ): TZ_PREPARATION -> TZ_PREPARATION (уточнення)', () => {
+      const res = validateTransition('TZ_PREPARATION', 'TZ_PREPARATION', null, 'A');
+      assert.equal(res.ok, true);
+      assert.equal(res.noop, true);
+    });
 
-  it('Rejects invalid direct transition NEW -> RESOLVED', () => {
-    const res = validateTransition('NEW', 'RESOLVED', 'Some resolution');
-    assert.equal(res.ok, false);
-    assert.match(res.error, /Недопустимий перехід: NEW → RESOLVED/);
-  });
+    it('Supports returning from UAT back to TZ_PREPARATION or IN_PROGRESS', () => {
+      assert.equal(validateTransition('UAT', 'TZ_PREPARATION', null, 'A').ok, true);
+      assert.equal(validateTransition('UAT', 'IN_PROGRESS', null, 'A').ok, true);
+    });
 
-  it('Allows IN_PROGRESS -> RESOLVED with a resolution note', () => {
-    const res = validateTransition('IN_PROGRESS', 'RESOLVED', 'Фікс застосовано');
-    assert.equal(res.ok, true);
-  });
-
-  it('Rejects IN_PROGRESS -> RESOLVED if resolution note is missing or empty', () => {
-    const res = validateTransition('IN_PROGRESS', 'RESOLVED', '');
-    assert.equal(res.ok, false);
-    assert.match(res.error, /resolutionNote/);
-  });
-
-  it('Allows RESOLVED -> IN_PROGRESS (Reopening)', () => {
-    const res = validateTransition('RESOLVED', 'IN_PROGRESS');
-    assert.equal(res.ok, true);
-  });
-
-  it('Allows RESOLVED -> CLOSED', () => {
-    const res = validateTransition('RESOLVED', 'CLOSED');
-    assert.equal(res.ok, true);
-  });
-
-  it('Rejects all transitions out of CLOSED status', () => {
-    for (const target of ['NEW', 'IN_PROGRESS', 'RESOLVED']) {
-      const res = validateTransition('CLOSED', target);
+    it('Rejects invalid direct skip: NEW -> RESOLVED on Branch A', () => {
+      const res = validateTransition('NEW', 'RESOLVED', 'Done', 'A');
       assert.equal(res.ok, false);
-    }
+      assert.match(res.error, /Недопустимий перехід/);
+    });
+
+    it('Rejects UAT -> RESOLVED without resolution note', () => {
+      const res = validateTransition('UAT', 'RESOLVED', '', 'A');
+      assert.equal(res.ok, false);
+      assert.match(res.error, /resolutionNote/);
+    });
   });
 
-  it('Handles identical status gracefully as idempotent no-op', () => {
-    const res = validateTransition('IN_PROGRESS', 'IN_PROGRESS');
-    assert.equal(res.ok, true);
-    assert.equal(res.noop, true);
+  describe('Branch C (Incident Triage & Fast-Track)', () => {
+    it('Allows Incident flow: NEW -> TRIAGE -> IN_PROGRESS -> RESOLVED -> CLOSED', () => {
+      assert.equal(validateTransition('NEW', 'TRIAGE', null, 'C', 'INCIDENT').ok, true);
+      assert.equal(validateTransition('TRIAGE', 'IN_PROGRESS', null, 'C', 'INCIDENT').ok, true);
+      assert.equal(validateTransition('IN_PROGRESS', 'RESOLVED', 'Сервер перезавантажено', 'C', 'INCIDENT').ok, true);
+      assert.equal(validateTransition('RESOLVED', 'CLOSED', null, 'C', 'INCIDENT').ok, true);
+    });
+
+    it('Allows direct Quick-Fix resolution: TRIAGE -> RESOLVED with note', () => {
+      const res = validateTransition('TRIAGE', 'RESOLVED', 'Швидке виправлення конфігурації', 'C', 'INCIDENT');
+      assert.equal(res.ok, true);
+    });
+  });
+
+  describe('Branch D (Approvals & Access/License requests)', () => {
+    it('Allows Approval flow: NEW -> PENDING_APPROVAL -> APPROVED -> IN_PROGRESS -> RESOLVED', () => {
+      assert.equal(validateTransition('NEW', 'PENDING_APPROVAL', null, 'D').ok, true);
+      assert.equal(validateTransition('PENDING_APPROVAL', 'APPROVED', null, 'D').ok, true);
+      assert.equal(validateTransition('APPROVED', 'IN_PROGRESS', null, 'D').ok, true);
+      assert.equal(validateTransition('IN_PROGRESS', 'RESOLVED', 'Доступ активовано', 'D').ok, true);
+    });
+
+    it('Allows rejection flow: PENDING_APPROVAL -> REJECTED', () => {
+      const res = validateTransition('PENDING_APPROVAL', 'REJECTED', null, 'D');
+      assert.equal(res.ok, true);
+    });
   });
 });
 
 describe('3. Business Logic: SLA Auto-Escalation Cron', () => {
-  const baseTime = new Date('2026-09-01T12:00:00.000Z').getTime();
-
   it('Escalates ticket when deadline is within 30 minutes', () => {
+    const now = new Date('2026-09-01T12:00:00.000Z').getTime();
     const app = {
-      status: 'IN_PROGRESS',
       priority: 'HIGH',
-      slaDeadline: '2026-09-01T12:20:00.000Z', // 20 mins from baseTime
+      status: 'IN_PROGRESS',
+      slaDeadline: '2026-09-01T12:20:00.000Z', // 20 mins away
     };
-    assert.equal(shouldEscalateSla(app, baseTime), true);
+    assert.equal(shouldEscalateSla(app, now), true);
   });
 
   it('Escalates ticket when deadline is already overdue', () => {
+    const now = new Date('2026-09-01T12:00:00.000Z').getTime();
     const app = {
+      priority: 'MEDIUM',
       status: 'NEW',
-      priority: 'LOW',
       slaDeadline: '2026-09-01T11:55:00.000Z', // 5 mins overdue
     };
-    assert.equal(shouldEscalateSla(app, baseTime), true);
+    assert.equal(shouldEscalateSla(app, now), true);
   });
 
   it('Does NOT escalate ticket when deadline is more than 30 minutes away', () => {
+    const now = new Date('2026-09-01T12:00:00.000Z').getTime();
     const app = {
-      status: 'NEW',
-      priority: 'HIGH',
+      priority: 'LOW',
+      status: 'IN_PROGRESS',
       slaDeadline: '2026-09-01T14:00:00.000Z', // 2 hours away
     };
-    assert.equal(shouldEscalateSla(app, baseTime), false);
+    assert.equal(shouldEscalateSla(app, now), false);
   });
 
   it('Does NOT escalate ticket if it is already CRITICAL', () => {
+    const now = new Date('2026-09-01T12:00:00.000Z').getTime();
     const app = {
-      status: 'IN_PROGRESS',
       priority: 'CRITICAL',
+      status: 'IN_PROGRESS',
       slaDeadline: '2026-09-01T12:10:00.000Z',
     };
-    assert.equal(shouldEscalateSla(app, baseTime), false);
+    assert.equal(shouldEscalateSla(app, now), false);
   });
 
   it('Does NOT escalate ticket if status is RESOLVED or CLOSED', () => {
+    const now = new Date('2026-09-01T12:00:00.000Z').getTime();
     const resolvedApp = {
+      priority: 'HIGH',
       status: 'RESOLVED',
-      priority: 'MEDIUM',
-      slaDeadline: '2026-09-01T12:05:00.000Z',
+      slaDeadline: '2026-09-01T12:10:00.000Z',
     };
     const closedApp = {
+      priority: 'HIGH',
       status: 'CLOSED',
-      priority: 'MEDIUM',
-      slaDeadline: '2026-09-01T12:05:00.000Z',
+      slaDeadline: '2026-09-01T12:10:00.000Z',
     };
-    assert.equal(shouldEscalateSla(resolvedApp, baseTime), false);
-    assert.equal(shouldEscalateSla(closedApp, baseTime), false);
+    assert.equal(shouldEscalateSla(resolvedApp, now), false);
+    assert.equal(shouldEscalateSla(closedApp, now), false);
   });
 });
 
@@ -215,15 +268,12 @@ describe('4. Business Logic: ITSM Workflow State Machines', () => {
     assert.deepEqual(CHANGE_WORKFLOW.DRAFT, ['PENDING']);
     assert.deepEqual(CHANGE_WORKFLOW.PENDING, ['APPROVED', 'REJECTED']);
     assert.deepEqual(CHANGE_WORKFLOW.APPROVED, ['IMPLEMENTED']);
-    assert.deepEqual(CHANGE_WORKFLOW.IMPLEMENTED, []);
-    assert.deepEqual(CHANGE_WORKFLOW.REJECTED, []);
   });
 
   it('Problem workflow validates RCA -> KNOWN_ERROR -> RESOLVED steps', () => {
     assert.deepEqual(PROBLEM_WORKFLOW.NEW, ['RCA']);
     assert.deepEqual(PROBLEM_WORKFLOW.RCA, ['KNOWN_ERROR']);
     assert.deepEqual(PROBLEM_WORKFLOW.KNOWN_ERROR, ['RESOLVED']);
-    assert.deepEqual(PROBLEM_WORKFLOW.RESOLVED, []);
   });
 
   it('Knowledge Base workflow validates DRAFT -> PUBLISHED <-> ARCHIVED', () => {

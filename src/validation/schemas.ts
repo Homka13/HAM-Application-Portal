@@ -5,7 +5,20 @@ const idString = z.string().min(1);
 // Shared enum values (stored as strings in the Prisma schema).
 const applicationType = z.enum(['SERVICE_REQUEST', 'INCIDENT']);
 const priority = z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']);
-const applicationStatus = z.enum(['NEW', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']);
+const applicationStatus = z.enum([
+  'NEW',
+  'TZ_PREPARATION',
+  'PENDING_APPROVAL',
+  'APPROVED',
+  'TRIAGE',
+  'ESTIMATION',
+  'IN_PROGRESS',
+  'TESTING',
+  'UAT',
+  'RESOLVED',
+  'CLOSED',
+  'REJECTED',
+]);
 const changeType = z.enum(['STANDARD', 'NORMAL', 'EMERGENCY']);
 const changeRisk = z.enum(['LOW', 'MEDIUM', 'HIGH']);
 const changeStatus = z.enum(['DRAFT', 'PENDING', 'APPROVED', 'IMPLEMENTED', 'REJECTED']);
@@ -138,7 +151,9 @@ export const createApplicationBody = z.object({
 export const updateApplicationStatusBody = z.object({
   status: applicationStatus,
   changedBy: z.string().optional(),
+  actorRole: z.enum(['USER', 'ADMIN', 'POC', 'APPROVER', 'SYSTEM']).optional(),
   resolutionNote: z.string().optional(),
+  rejectionReason: z.string().optional(),
 });
 
 export const linkProblemBody = z.object({ problemId: idString });

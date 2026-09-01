@@ -10,12 +10,75 @@ const SLA_HOURS: Record<string, number> = {
   LOW: 72,
 };
 
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  NEW: ['IN_PROGRESS', 'CLOSED'],
+// Branch A/B/E: ТЗ Loop, Estimation, Development, Testing, UAT, Resolution, Closure
+export const TRANSITIONS_BRANCH_ABE: Record<string, string[]> = {
+  NEW: ['TZ_PREPARATION', 'REJECTED'],
+  TZ_PREPARATION: ['ESTIMATION', 'TZ_PREPARATION', 'REJECTED'],
+  ESTIMATION: ['IN_PROGRESS', 'TZ_PREPARATION', 'REJECTED'],
+  IN_PROGRESS: ['TESTING', 'TZ_PREPARATION', 'REJECTED'],
+  TESTING: ['UAT', 'IN_PROGRESS'],
+  UAT: ['RESOLVED', 'TZ_PREPARATION', 'IN_PROGRESS'],
+  RESOLVED: ['CLOSED', 'IN_PROGRESS', 'UAT'],
+  CLOSED: [],
+  REJECTED: ['TZ_PREPARATION', 'NEW'],
+};
+
+// Branch C: Incident Triage & Resolution
+export const TRANSITIONS_BRANCH_C: Record<string, string[]> = {
+  NEW: ['TRIAGE', 'IN_PROGRESS', 'REJECTED'],
+  TRIAGE: ['IN_PROGRESS', 'RESOLVED', 'REJECTED'],
+  IN_PROGRESS: ['RESOLVED', 'CLOSED', 'REJECTED'],
+  RESOLVED: ['CLOSED', 'IN_PROGRESS'],
+  CLOSED: [],
+  REJECTED: ['NEW', 'TRIAGE'],
+};
+
+// Branch D: Approval Lifecycle (Доступи, Ліцензії)
+export const TRANSITIONS_BRANCH_D: Record<string, string[]> = {
+  NEW: ['PENDING_APPROVAL', 'REJECTED'],
+  PENDING_APPROVAL: ['APPROVED', 'REJECTED'],
+  APPROVED: ['IN_PROGRESS', 'RESOLVED'],
   IN_PROGRESS: ['RESOLVED', 'CLOSED'],
   RESOLVED: ['CLOSED', 'IN_PROGRESS'],
   CLOSED: [],
+  REJECTED: ['PENDING_APPROVAL', 'NEW'],
 };
+
+// Global fallback transitions map
+export const GLOBAL_TRANSITIONS: Record<string, string[]> = {
+  NEW: ['TZ_PREPARATION', 'PENDING_APPROVAL', 'TRIAGE', 'ESTIMATION', 'IN_PROGRESS', 'REJECTED'],
+  TZ_PREPARATION: ['ESTIMATION', 'TZ_PREPARATION', 'REJECTED'],
+  PENDING_APPROVAL: ['APPROVED', 'REJECTED'],
+  APPROVED: ['IN_PROGRESS', 'RESOLVED'],
+  TRIAGE: ['IN_PROGRESS', 'RESOLVED', 'REJECTED'],
+  ESTIMATION: ['IN_PROGRESS', 'TZ_PREPARATION', 'REJECTED'],
+  IN_PROGRESS: ['TESTING', 'UAT', 'RESOLVED', 'CLOSED', 'TZ_PREPARATION', 'REJECTED'],
+  TESTING: ['UAT', 'IN_PROGRESS', 'RESOLVED'],
+  UAT: ['RESOLVED', 'TZ_PREPARATION', 'IN_PROGRESS'],
+  RESOLVED: ['CLOSED', 'IN_PROGRESS', 'UAT'],
+  CLOSED: [],
+  REJECTED: ['NEW', 'TZ_PREPARATION', 'PENDING_APPROVAL', 'TRIAGE'],
+};
+
+export function getBranchForApp(app: { formType?: string | null; type?: string | null }): 'C' | 'D' | 'ABE' {
+  const formType = (app.formType || '').trim().toUpperCase();
+  const type = (app.type || '').trim().toUpperCase();
+
+  if (formType === 'C' || type === 'INCIDENT') {
+    return 'C';
+  }
+  if (formType === 'D') {
+    return 'D';
+  }
+  return 'ABE';
+}
+
+export function getAllowedTransitions(app: { formType?: string | null; type?: string | null; status: string }): string[] {
+  const branch = getBranchForApp(app);
+  if (branch === 'C') return TRANSITIONS_BRANCH_C[app.status] || [];
+  if (branch === 'D') return TRANSITIONS_BRANCH_D[app.status] || [];
+  return TRANSITIONS_BRANCH_ABE[app.status] || GLOBAL_TRANSITIONS[app.status] || [];
+}
 
 export const createApplication = async (req: Request, res: Response): Promise<void> => {
   const {
@@ -42,13 +105,24 @@ export const createApplication = async (req: Request, res: Response): Promise<vo
     dueDate,
     clickupTaskId,
   } = req.body;
+
+  // Auto-sync type if service is known
+  let resolvedType = type || 'SERVICE_REQUEST';
+  if (serviceCatalogId) {
+    const services = localStore.getServices();
+    const srv = services.find((s) => s.id === serviceCatalogId);
+    if (srv?.defaultType) {
+      resolvedType = srv.defaultType;
+    }
+  }
+
   const hours = SLA_HOURS[priority] ?? 72;
   const slaDeadline = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 
   try {
     const application = await db.orm.public.Application.create({
       applicantName,
-      type,
+      type: resolvedType,
       priority,
       description,
       slaDeadline,
@@ -75,7 +149,7 @@ export const createApplication = async (req: Request, res: Response): Promise<vo
   } catch {
     const application = localStore.createApplication({
       applicantName,
-      type,
+      type: resolvedType,
       priority,
       description,
       slaDeadline,
@@ -132,7 +206,7 @@ export const getApplicationLogs = async (req: Request, res: Response): Promise<v
 
 export const updateApplicationStatus = async (req: Request, res: Response): Promise<void> => {
   const id = req.params.id as string;
-  const { status, changedBy, resolutionNote } = req.body;
+  const { status, changedBy, actorRole, resolutionNote, rejectionReason } = req.body;
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -146,15 +220,21 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
         return currentApp;
       }
 
-      const allowedStatuses = VALID_TRANSITIONS[currentApp.status] || [];
+      const allowedStatuses = getAllowedTransitions(currentApp);
       if (!allowedStatuses.includes(status)) {
-        throw new ValidationError(`Недопустимий перехід: ${currentApp.status} → ${status}`);
+        throw new ValidationError(
+          `Недопустимий перехід: ${currentApp.status} → ${status} (Гілка: ${getBranchForApp(currentApp)})`,
+        );
       }
 
       if (status === 'RESOLVED' && !resolutionNote) {
         throw new ValidationError(
           'Для переведення в RESOLVED необхідно вказати опис рішення (resolutionNote)',
         );
+      }
+
+      if (status === 'REJECTED' && rejectionReason) {
+        console.log(`[Status Update] Application ${id} rejected: ${rejectionReason}`);
       }
 
       const updatedApp = await tx.orm.public.Application.where({ id }).update({ status });
@@ -164,7 +244,7 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
         field: 'STATUS',
         oldValue: currentApp.status,
         newValue: status,
-        changedBy: changedBy || 'System',
+        changedBy: changedBy || actorRole || 'System',
       });
 
       return updatedApp;
@@ -186,9 +266,11 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
       return;
     }
 
-    const allowedStatuses = VALID_TRANSITIONS[currentApp.status] || [];
+    const allowedStatuses = getAllowedTransitions(currentApp);
     if (!allowedStatuses.includes(status)) {
-      throw new ValidationError(`Недопустимий перехід: ${currentApp.status} → ${status}`);
+      throw new ValidationError(
+        `Недопустимий перехід: ${currentApp.status} → ${status} (Гілка: ${getBranchForApp(currentApp)})`,
+      );
     }
 
     if (status === 'RESOLVED' && !resolutionNote) {
@@ -203,7 +285,7 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
       field: 'STATUS',
       oldValue: currentApp.status,
       newValue: status,
-      changedBy: changedBy || 'System',
+      changedBy: changedBy || actorRole || 'System',
     });
 
     res.status(200).json(updatedApp);

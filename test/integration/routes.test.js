@@ -232,52 +232,149 @@ describe('Integration Tests: HAM Portal REST API', () => {
       assert.ok(found, 'Created application should be in the list');
     });
 
-    it('PATCH /api/applications/:id/status allows valid transition NEW -> IN_PROGRESS', async () => {
-      const res = await request(app)
-        .patch(`/api/applications/${createdAppId}/status`)
-        .send({ status: 'IN_PROGRESS', changedBy: 'admin@ham.local' });
+    it('Branch A/B/E: Transitions through NEW -> TZ_PREPARATION -> ESTIMATION -> IN_PROGRESS -> TESTING -> UAT -> RESOLVED -> CLOSED', async () => {
+      const branchAApp = await request(app)
+        .post('/api/applications')
+        .send({
+          applicantName: 'Олена Петренко',
+          formType: 'A',
+          description: 'Розробка модуля CRM',
+        });
+      const appId = branchAApp.body.id;
 
+      // 1. NEW -> TZ_PREPARATION
+      let res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'TZ_PREPARATION', changedBy: 'analyst@ham.local' });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, 'TZ_PREPARATION');
+
+      // 2. TZ_PREPARATION -> ESTIMATION
+      res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'ESTIMATION', changedBy: 'lead@ham.local' });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, 'ESTIMATION');
+
+      // 3. ESTIMATION -> IN_PROGRESS
+      res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'IN_PROGRESS', changedBy: 'dev@ham.local' });
       assert.equal(res.status, 200);
       assert.equal(res.body.status, 'IN_PROGRESS');
+
+      // 4. IN_PROGRESS -> TESTING
+      res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'TESTING', changedBy: 'qa@ham.local' });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, 'TESTING');
+
+      // 5. TESTING -> UAT
+      res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'UAT', changedBy: 'qa@ham.local' });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, 'UAT');
+
+      // 6. UAT -> RESOLVED (requires resolution note)
+      res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'RESOLVED', changedBy: 'user@ham.local', resolutionNote: 'Протестовано і прийнято в UAT' });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, 'RESOLVED');
+
+      // 7. RESOLVED -> CLOSED
+      res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'CLOSED', changedBy: 'system' });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, 'CLOSED');
     });
 
-    it('PATCH /api/applications/:id/status rejects IN_PROGRESS -> RESOLVED without resolutionNote', async () => {
-      const res = await request(app)
-        .patch(`/api/applications/${createdAppId}/status`)
-        .send({ status: 'RESOLVED' });
-
-      assert.equal(res.status, 400);
-      assert.match(res.body.error, /resolutionNote/);
-    });
-
-    it('PATCH /api/applications/:id/status successfully transitions to RESOLVED with note', async () => {
-      const res = await request(app)
-        .patch(`/api/applications/${createdAppId}/status`)
+    it('Branch C: Transitions through NEW -> TRIAGE -> IN_PROGRESS -> RESOLVED for incident', async () => {
+      const incidentApp = await request(app)
+        .post('/api/applications')
         .send({
-          status: 'RESOLVED',
-          changedBy: 'admin@ham.local',
-          resolutionNote: 'Замінено картридж та оновлено драйвер',
+          applicantName: 'Черговий інженер',
+          type: 'INCIDENT',
+          priority: 'CRITICAL',
+          description: 'Збій бази даних',
         });
+      const appId = incidentApp.body.id;
 
+      // 1. NEW -> TRIAGE
+      let res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'TRIAGE', changedBy: 'oncall@ham.local' });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, 'TRIAGE');
+
+      // 2. TRIAGE -> IN_PROGRESS
+      res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'IN_PROGRESS', changedBy: 'dba@ham.local' });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, 'IN_PROGRESS');
+
+      // 3. IN_PROGRESS -> RESOLVED
+      res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'RESOLVED', changedBy: 'dba@ham.local', resolutionNote: 'Кластер переключено на резервну ноду' });
       assert.equal(res.status, 200);
       assert.equal(res.body.status, 'RESOLVED');
     });
 
-    it('GET /api/applications/:id/logs returns audit history logs', async () => {
+    it('Branch D: Transitions through NEW -> PENDING_APPROVAL -> APPROVED -> IN_PROGRESS -> RESOLVED', async () => {
+      const accessApp = await request(app)
+        .post('/api/applications')
+        .send({
+          applicantName: 'Марія Коваль',
+          formType: 'D',
+          subtype: 'Доступ',
+          payload: { role: 'BI_VIEWER' },
+        });
+      const appId = accessApp.body.id;
+
+      // 1. NEW -> PENDING_APPROVAL
+      let res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'PENDING_APPROVAL', changedBy: 'user@ham.local' });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, 'PENDING_APPROVAL');
+
+      // 2. PENDING_APPROVAL -> APPROVED
+      res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'APPROVED', changedBy: 'manager@ham.local' });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, 'APPROVED');
+
+      // 3. APPROVED -> RESOLVED
+      res = await request(app).patch(`/api/applications/${appId}/status`).send({ status: 'RESOLVED', changedBy: 'admin@ham.local', resolutionNote: 'Роль призначено в IAM' });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.status, 'RESOLVED');
+    });
+
+    it('GET /api/applications/:id/logs returns audit history logs for status changes', async () => {
       const res = await request(app).get(`/api/applications/${createdAppId}/logs`);
       assert.equal(res.status, 200);
       assert.ok(Array.isArray(res.body));
-      assert.ok(res.body.length >= 2, 'Should have logs for IN_PROGRESS and RESOLVED transitions');
     });
   });
 
   describe('3. Services Catalog API (/api/services)', () => {
-    it('GET /api/services returns catalog list of services', async () => {
+    it('GET /api/services returns all catalog services including Power BI, Номенклатура, Зупинка виробництва', async () => {
       const res = await request(app).get('/api/services');
       assert.equal(res.status, 200);
       assert.ok(Array.isArray(res.body));
-      assert.ok(res.body.length > 0);
-      assert.ok(res.body.some((s) => s.id === 'srv-1'));
+      assert.ok(res.body.length >= 9);
+
+      const names = res.body.map((s) => s.name);
+      assert.ok(names.includes('Створення звіт павер бі'));
+      assert.ok(names.includes('Отримання доступу до павер бі'));
+      assert.ok(names.includes('Створення заявки на номенклатуру'));
+      assert.ok(names.includes('Зупинка виробництва'));
+    });
+
+    it('Synchronizes type with service: «Зупинка виробництва» -> INCIDENT', async () => {
+      const res = await request(app)
+        .post('/api/applications')
+        .send({
+          applicantName: 'Цех №3',
+          serviceCatalogId: 'srv-9',
+          description: 'Зупинка головного конвеєра',
+        });
+      assert.equal(res.status, 201);
+      assert.equal(res.body.type, 'INCIDENT');
+    });
+
+    it('Synchronizes type with service: «Створення звіт павер бі» -> SERVICE_REQUEST', async () => {
+      const res = await request(app)
+        .post('/api/applications')
+        .send({
+          applicantName: 'Аналітик Денис',
+          serviceCatalogId: 'srv-6',
+          description: 'Звіт з продажів за серпень',
+        });
+      assert.equal(res.status, 201);
+      assert.equal(res.body.type, 'SERVICE_REQUEST');
     });
   });
 
