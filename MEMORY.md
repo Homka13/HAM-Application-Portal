@@ -66,3 +66,10 @@
   - Removed admin/user switcher from the header (defaulting to standard user).
   - Created `src/lib/storage.ts` providing seamless local JSON persistence with pre-seeded services and KB articles when PostgreSQL is offline, while automatically routing to Prisma Postgres in production.
   - Relaxed Zod validation to accept string IDs (`srv-*` and UUIDs).
+
+### 11. Docker & Render Deployment Build Fix (`ENOENT /app/frontend/package.json`)
+- **Problem**: When building the Docker image on Render, `npm run build` failed with `ENOENT: no such file or directory, open '/app/frontend/package.json'`.
+- **Solution**:
+  - Cleaned `.dockerignore` to remove `frontend` and `src/prisma/contract.*` so the build context includes the entire monorepo.
+  - Updated `Dockerfile` to copy `package*.json` and `frontend/package*.json` before `npm install`, and set `CMD ["node", "dist/index.js"]` for fast standalone startup.
+

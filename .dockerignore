@@ -1,9 +1,8 @@
 node_modules
 dist
-prisma/dev.db
-prisma/dev.db-journal
-frontend
 .git
 .env
-src/prisma/contract.json
-src/prisma/contract.d.ts
+data
+*.db
+*.db-journal
+backups
