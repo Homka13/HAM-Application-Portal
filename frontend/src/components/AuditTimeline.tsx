@@ -29,54 +29,53 @@ export const AuditTimeline = ({ appId }: { appId: string }) => {
 
   if (logs.length === 0) {
     return (
-      <div className="py-4 text-center text-sm text-gray-400">
-        Змін ще не було
+      <div className="py-4 text-center text-xs font-mono text-[#8B7D72]">
+        Змін ще не зафіксовано в аудит-журналі
       </div>
     );
   }
 
   return (
-    <div className="flow-root py-2">
-      <ul className="-mb-8">
-        {logs.map((log, index) => (
-          <li key={log.id}>
-            <div className="relative pb-6">
-              {index !== logs.length - 1 && (
-                <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" />
-              )}
-
-              <div className="relative flex space-x-3">
-                <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center ring-8 ring-white">
-                  <span className="text-white text-[10px] font-bold">LOG</span>
+    <div className="py-3">
+      <div className="text-xs font-semibold text-[#5A4E45] mb-3 uppercase tracking-wider font-mono">
+        Аудит-журнал переміщень
+      </div>
+      <div className="flex flex-col gap-0">
+        {logs.map((log, index) => {
+          const isLatest = index === 0;
+          return (
+            <div key={log.id} className="flex gap-3">
+              <div className="flex flex-col items-center pt-1">
+                <div
+                  className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                    isLatest ? 'bg-[#E8663B] ring-2 ring-[#FDEDE5]' : 'bg-[#DED4CA]'
+                  }`}
+                />
+                {index !== logs.length - 1 && (
+                  <div className="w-px flex-1 bg-[#EDE5DD] min-h-[36px]" />
+                )}
+              </div>
+              <div className="flex flex-col gap-1 pb-4 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-semibold text-[#1E1712]">
+                    {FIELD_LABELS[log.field] || log.field}:{' '}
+                    <span className="font-mono text-[#8B7D72]">{log.oldValue ?? '—'}</span>{' '}
+                    <span className="text-[#8B7D72]">➔</span>{' '}
+                    <span className="font-mono font-bold text-[#E8663B]">{log.newValue ?? '—'}</span>
+                  </span>
+                  <span className="text-[11px] font-mono text-[#8B7D72] whitespace-nowrap">
+                    {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })},{' '}
+                    {new Date(log.createdAt).toLocaleDateString([], { day: '2-digit', month: '2-digit' })}
+                  </span>
                 </div>
-                <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
-                  <div>
-                    <p className="text-sm text-gray-500">
-                      <span className="font-medium text-gray-900">{log.changedBy}</span>
-                      {' змінив '}
-                      <span className="font-bold text-gray-700">
-                        {FIELD_LABELS[log.field] || log.field}
-                      </span>
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      {log.oldValue ?? '—'}{' '}
-                      <span className="text-gray-500">→</span>{' '}
-                      <span className="text-green-600 font-medium">
-                        {log.newValue ?? '—'}
-                      </span>
-                    </p>
-                  </div>
-                  <div className="whitespace-nowrap text-right text-sm text-gray-400">
-                    <time dateTime={log.createdAt}>
-                      {new Date(log.createdAt).toLocaleString()}
-                    </time>
-                  </div>
+                <div className="text-[11px] text-[#8B7D72]">
+                  Автор зміни: <span className="font-medium text-[#5A4E45]">{log.changedBy}</span>
                 </div>
               </div>
             </div>
-          </li>
-        ))}
-      </ul>
+          );
+        })}
+      </div>
     </div>
   );
 };
