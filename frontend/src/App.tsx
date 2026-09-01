@@ -411,20 +411,15 @@ function App() {
       {/* 1. STICKY HEADER */}
       <header className="sticky top-0 z-30 bg-[#FBF8F5]/90 backdrop-blur-md border-b border-[#EDE5DD]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
+          <div className="flex items-center gap-3">
             <img
               src="/mascot.png"
-              alt="Носуха HAM"
+              alt="Маскот носуха"
               className="w-8 h-8 rounded-lg object-cover shadow-sm"
             />
-            <div className="flex flex-col">
-              <span className="text-sm font-bold tracking-tight text-[#1E1712]">
-                Портал запитів та заявок HAM
-              </span>
-              <span className="text-[11px] font-mono text-[#8B7D72]">
-                ITSM · Data / Power BI · ITIL
-              </span>
-            </div>
+            <span className="text-sm font-bold tracking-tight text-[#1E1712]">
+              Портал запитів та заявок
+            </span>
           </div>
 
           {/* TAB SWITCHER */}
@@ -461,23 +456,15 @@ function App() {
         {tab === 'incidents' && (
           <div className="space-y-10">
             {/* HERO INTRODUCTION */}
-            <div className="flex gap-6 items-center justify-between py-1 flex-wrap">
-              <div className="flex-1 min-w-[280px]">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1E1712]">
-                  Єдине вікно запитів та інцидентів
-                </h1>
-              </div>
-              <div className="flex-shrink-0 flex items-center gap-3 bg-white border border-[#EDE5DD] rounded-2xl p-2.5 px-3.5 shadow-sm">
-                <img
-                  src="/mascot-preview.png"
-                  alt="Маскот носуха"
-                  className="w-10 h-10 rounded-xl object-cover"
-                />
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold text-[#1E1712]">ITSM & BI Portal</span>
-                  <span className="text-[11px] font-mono text-[#8B7D72]">Автоматизований процесинг</span>
-                </div>
-              </div>
+            <div className="flex items-center gap-3.5 py-1">
+              <img
+                src="/mascot-preview.png"
+                alt="Маскот носуха"
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl object-cover shadow-sm flex-shrink-0"
+              />
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1E1712]">
+                Єдине вікно запитів та інцидентів
+              </h1>
             </div>
 
             {/* 3. APPLICATION CREATION FORM */}
