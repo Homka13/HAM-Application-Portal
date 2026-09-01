@@ -461,25 +461,21 @@ function App() {
         {tab === 'incidents' && (
           <div className="space-y-10">
             {/* HERO INTRODUCTION */}
-            <div className="flex gap-8 items-center py-2 flex-wrap">
-              <div className="flex-1 min-w-[320px] flex flex-col gap-3">
-                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1E1712] leading-tight">
+            <div className="flex gap-6 items-center justify-between py-1 flex-wrap">
+              <div className="flex-1 min-w-[280px]">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1E1712]">
                   Єдине вікно запитів та інцидентів
                 </h1>
-                <p className="text-sm sm:text-base text-[#5A4E45] leading-relaxed max-w-2xl">
-                  Тепла палітра носухи, компактна щільність робочого інструменту, семантика пріоритетів P1–P4 і 12 статусів заявки з повною підтримкою розробки, ТЗ та погоджень.
-                </p>
               </div>
-              <div className="flex-shrink-0 flex justify-center">
-                <div className="w-56 p-4 rounded-2xl bg-white border border-[#EDE5DD] shadow-[0_8px_24px_rgba(62,36,23,0.04)] flex flex-col items-center gap-2.5">
-                  <img
-                    src="/mascot-preview.png"
-                    alt="Маскот носуха"
-                    className="w-20 h-20 rounded-2xl object-cover"
-                  />
-                  <div className="text-[11px] text-[#8B7D72] text-center leading-snug">
-                    Маскот присутній делікатно:<br />лого, привітання, порожні стани
-                  </div>
+              <div className="flex-shrink-0 flex items-center gap-3 bg-white border border-[#EDE5DD] rounded-2xl p-2.5 px-3.5 shadow-sm">
+                <img
+                  src="/mascot-preview.png"
+                  alt="Маскот носуха"
+                  className="w-10 h-10 rounded-xl object-cover"
+                />
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-[#1E1712]">ITSM & BI Portal</span>
+                  <span className="text-[11px] font-mono text-[#8B7D72]">Автоматизований процесинг</span>
                 </div>
               </div>
             </div>
@@ -491,7 +487,7 @@ function App() {
                   <span className="w-2 h-2 rounded-full bg-[#E8663B]" />
                   <h2 className="text-base font-bold text-[#1E1712]">Створити нову заявку</h2>
                 </div>
-                <span className="text-xs font-mono text-[#8B7D72]">Форми A–E · WSJF · SLA</span>
+                <span className="text-xs font-mono text-[#8B7D72]">WSJF · SLA · ITIL</span>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -566,18 +562,18 @@ function App() {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-[#5A4E45]">Форма / Підтип</label>
+                    <label className="text-xs font-semibold text-[#5A4E45]">Напрямок / Підтип</label>
                     <div className="grid grid-cols-2 gap-2">
                       <select
                         value={formType}
                         onChange={(e) => setFormType(e.target.value)}
                         className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-2 outline-none focus:border-[#E8663B]"
                       >
-                        <option value="A">Форма A (Розробка)</option>
-                        <option value="B">Форма B (Ad-hoc / Вивантаження)</option>
-                        <option value="C">Форма C (Інцидент)</option>
-                        <option value="D">Форма D (Доступ / Ліцензія)</option>
-                        <option value="E">Форма E (Консультація)</option>
+                        <option value="A">Розробка / Новий звіт</option>
+                        <option value="B">Ad-hoc / Вивантаження</option>
+                        <option value="C">Інцидент</option>
+                        <option value="D">Доступ / Ліцензія</option>
+                        <option value="E">Консультація</option>
                       </select>
                       <select
                         value={subtype}
@@ -892,7 +888,7 @@ function App() {
                         Назва / Опис
                       </th>
                       <th className="text-left font-mono text-[11px] font-semibold text-[#8B7D72] uppercase tracking-wider py-2.5 px-4">
-                        Форма / Сервіс
+                        Сервіс
                       </th>
                       <th className="text-left font-mono text-[11px] font-semibold text-[#8B7D72] uppercase tracking-wider py-2.5 px-4">
                         Пріоритет
@@ -933,10 +929,7 @@ function App() {
                               {app.description || app.service?.name || 'Заявка без опису'}
                             </td>
                             <td className="py-3 px-4 text-xs text-[#5A4E45]">
-                              <span className="font-mono font-bold text-[#E8663B]">
-                                {app.formType || 'A'}
-                              </span>{' '}
-                              · {app.service?.name || (app.type === 'INCIDENT' ? 'Інцидент' : 'Запит')}
+                              {app.service?.name || (app.type === 'INCIDENT' ? 'Інцидент' : 'Запит')}
                             </td>
                             <td className="py-3 px-4 whitespace-nowrap">
                               <span
