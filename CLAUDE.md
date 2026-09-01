@@ -33,7 +33,7 @@ This is an ITIL/ITSM-style application portal:
 - **Backend**: Express 5 + TypeScript + Prisma 8 ORM for PostgreSQL.
   - Storage Layer: Hybrid resilient storage via `src/lib/storage.ts` — automatically queries Prisma Postgres in production and falls back to persistent local storage (`data/local-db.json`) in local development when PostgreSQL is not running.
   - Serves compiled React frontend from `dist/public` with an Express 5 compatible SPA fallback.
-  - Binds dynamically to `process.env.PORT || 3000` on dual-stack host.
+  - Binds dynamically to `process.env.PORT || 3000` on dual-stack host (`0.0.0.0`).
   - Domain models: `Application` (service requests & incidents), `ServiceCatalog`, `ChangeRequest`, `Problem`, `KnowledgeArticle`, and `AuditLog`.
   - Background SLA escalation (`src/cronJobs.ts`) runs every 15 minutes to escalate approaching deadlines to CRITICAL priority with audit logging.
   - Prometheus metrics exposed at `/metrics` (`http_requests_total`, `http_request_duration_ms`, `itsm_tickets_by_status`).
@@ -41,6 +41,21 @@ This is an ITIL/ITSM-style application portal:
   - Feature boards: `Dashboard` (custom D3 charts), `ChangeBoard`, `ProblemBoard`, `KnowledgeBoard`, `AuditTimeline`.
   - All API calls use relative `/api/...` endpoints with array guards.
   - UI language is Ukrainian.
+
+---
+
+## Render Deployment Guide (Step-by-Step)
+
+To deploy the application on **Render (render.com)**:
+1. **Service Type**: Create a **Web Service** (NOT a Static Site).
+2. **Repository**: Connect `https://github.com/Homka13/HAM-Application-Portal.git` (Branch: `main`).
+3. **Environment / Runtime**: Select **Docker**.
+   - Dockerfile path: `./Dockerfile` (or root default).
+4. **Environment Variables** (Optional):
+   - `DATABASE_URL` — PostgreSQL connection string (if using external Managed Postgres; if omitted, the resilient `storage.ts` in-memory/file fallback takes over seamlessly).
+   - `PORT` — Set by Render automatically (`10000`). The server binds dynamically to `process.env.PORT`.
+5. **Health Check Path**: `/api/health`.
+6. **Deploy**: Trigger deployment. The container will install dependencies, emit contracts, compile Vite frontend and backend bundle, and start with `CMD ["node", "dist/index.js"]`.
 
 ---
 
@@ -75,3 +90,5 @@ The repository is configured for automated continuous deployment via **GitHub Ac
    - Added `ErrorBoundary` and guarded all component state setters with `Array.isArray(data) ? data : []`.
 9. **Zero-Config Local Storage & Zod String IDs**:
    - Added `src/lib/storage.ts` and updated Zod validation to allow custom string IDs (`srv-*`) alongside UUIDs.
+10. **Docker Build Context on Render (`.dockerignore`)**:
+    - Removed `frontend` and `src/prisma/contract.*` from `.dockerignore` so Docker builds have access to all client files and build steps succeed with `ENOENT` eliminated.

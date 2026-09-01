@@ -6,7 +6,7 @@
 - **Backend**: Node.js, Express 5, TypeScript, Prisma 8 ORM for PostgreSQL.
 - **Frontend**: React 19, Vite, TypeScript, Tailwind CSS, custom D3.js visualization charts.
 - **Monitoring & Metrics**: Prometheus client (`/metrics`) + Grafana dashboards.
-- **Deployment Platform**: Prisma Cloud Compute + Prisma Postgres (`eu-central-1`) via GitHub Actions CI/CD.
+- **Deployment Platform**: Prisma Cloud Compute (`eu-central-1`) + Render Web Service (Docker).
 
 ---
 
@@ -73,3 +73,10 @@
   - Cleaned `.dockerignore` to remove `frontend` and `src/prisma/contract.*` so the build context includes the entire monorepo.
   - Updated `Dockerfile` to copy `package*.json` and `frontend/package*.json` before `npm install`, and set `CMD ["node", "dist/index.js"]` for fast standalone startup.
 
+### 12. Render Deployment Setup & Verification
+- **Configuration on Render**:
+  - Service Type: **Web Service** (Docker).
+  - Repository: `Homka13/HAM-Application-Portal`, branch `main`.
+  - Dockerfile path: `./Dockerfile`.
+  - Health check path: `/api/health`.
+  - Port binding: Express automatically reads `process.env.PORT` (Render uses `10000`) and serves both API and SPA static bundle from `dist/public`.
