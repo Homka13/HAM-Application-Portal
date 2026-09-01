@@ -456,12 +456,7 @@ function App() {
         {tab === 'incidents' && (
           <div className="space-y-10">
             {/* HERO INTRODUCTION */}
-            <div className="flex items-center gap-3.5 py-1">
-              <img
-                src="/mascot-preview.png"
-                alt="Маскот носуха"
-                className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl object-cover shadow-sm flex-shrink-0"
-              />
+            <div className="py-1">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1E1712]">
                 Єдине вікно запитів та інцидентів
               </h1>
