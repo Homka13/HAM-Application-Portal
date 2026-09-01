@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useId } from 'react';
 
 export const DesignShowcase = () => {
   const [mascotVisible] = useState(true);
@@ -11,10 +11,21 @@ export const DesignShowcase = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
 
+  // Accessible IDs for form controls
+  const requestNameId = useId();
+  const reportUrlId = useId();
+  const dueDateId = useId();
+  const serviceSelectId = useId();
+  const descTextareaId = useId();
+  const bvRangeId = useId();
+  const riskRangeId = useId();
+  const tcRangeId = useId();
+  const modalTextareaId = useId();
+
   const wsjf = (((bv + risk + tc) / 3) * 2).toFixed(1);
 
-  const sev = (i: string, u: string) => {
-    const m: Record<string, string> = {
+  const getPriorityFromMatrix = (i: string, u: string) => {
+    const matrix: Record<string, string> = {
       'high-high': 'P1',
       'high-mid': 'P2',
       'high-low': 'P3',
@@ -25,10 +36,10 @@ export const DesignShowcase = () => {
       'low-mid': 'P4',
       'low-low': 'P4',
     };
-    return m[`${i}-${u}`] || 'P4';
+    return matrix[`${i}-${u}`] || 'P4';
   };
 
-  const tone: Record<string, [string, string, string]> = {
+  const tones: Record<string, [string, string, string]> = {
     P1: ['#FBE8E6', '#8E1F19', '#F3CFCB'],
     P2: ['#FDF1DC', '#92580A', '#F3DFB8'],
     P3: ['#E4F1F3', '#235C68', '#C7E1E5'],
@@ -41,7 +52,18 @@ export const DesignShowcase = () => {
     ['low', 'Низький'],
   ];
   const urgencies = ['high', 'mid', 'low'];
-  const pLabels: Record<string, string> = { P1: 'Критичний', P2: 'Високий', P3: 'Середній', P4: 'Низький' };
+  const priorityLabels: Record<string, string> = {
+    P1: 'Критичний',
+    P2: 'Високий',
+    P3: 'Середній',
+    P4: 'Низький',
+  };
+
+  const getUrgencyLabel = (u: string) => {
+    if (u === 'high') return 'Висока';
+    if (u === 'mid') return 'Середня';
+    return 'Низька';
+  };
 
   const stepDefs = [
     ['Новий', 1],
@@ -57,10 +79,36 @@ export const DesignShowcase = () => {
     ['Закрито', 0],
   ];
 
+  const getStepCircleClass = (st: number) => {
+    if (st === 2) return 'bg-white border-2 border-[#E8663B] ring-4 ring-[#FDEDE5]';
+    if (st === 1) return 'bg-[#E8663B]';
+    return 'bg-white border-2 border-[#DED4CA]';
+  };
+
+  const getStepTextClass = (st: number) => {
+    if (st === 2) return 'font-bold text-[#1E1712]';
+    if (st === 1) return 'text-[#5A4E45]';
+    return 'text-[#8B7D72]';
+  };
+
+  const getStepLeftLineBg = (index: number, st: number) => {
+    if (index === 0) return 'bg-transparent';
+    if (st !== 0) return 'bg-[#F9CDB4]';
+    return 'bg-[#EDE5DD]';
+  };
+
+  const getStepRightLineBg = (isLast: boolean, st: number) => {
+    if (isLast) return 'bg-transparent';
+    if (st === 1) return 'bg-[#F9CDB4]';
+    return 'bg-[#EDE5DD]';
+  };
+
   const fireToast = () => {
     setToastOpen(true);
     setTimeout(() => setToastOpen(false), 4000);
   };
+
+  const currentPriority = getPriorityFromMatrix(impact, urgency);
 
   return (
     <div className="space-y-10">
@@ -71,7 +119,7 @@ export const DesignShowcase = () => {
             Токени й компоненти<br />внутрішнього порталу
           </h1>
           <p className="text-sm sm:text-base text-[#5A4E45] leading-relaxed max-w-2xl">
-            Тепла палітра носухи, компактна щільність робочого інструменту, семантика пріоритетів P1–P4 і дванадцяти статусів заявки. Усе, з чого далі складаються робочі екрани.
+            Тепла палітра носухи, компактна щільність робочого інструменту, семантика пріоритетів P1–P4 і дванадцяти статусів заявки.
           </p>
         </div>
         {mascotVisible && (
@@ -83,7 +131,7 @@ export const DesignShowcase = () => {
                 className="w-28 h-28 rounded-2xl object-cover"
               />
               <div className="text-xs text-[#8B7D72] text-center leading-snug">
-                Маскот присутній делікатно:<br />лого, привітання, порожні стани
+                Маскот робочого простору
               </div>
             </div>
           </div>
@@ -194,7 +242,7 @@ export const DesignShowcase = () => {
           <div className="flex flex-col sm:flex-row gap-3 sm:items-baseline p-4 sm:px-5">
             <div className="w-36 font-mono text-xs text-[#8B7D72]">body / 14 / 400</div>
             <div className="text-sm text-[#1E1712] leading-relaxed max-w-xl">
-              Опишіть, який звіт потрібно доробити та які саме зміни очікуєте. Якщо запит стосується наявного звіту — додайте посилання.
+              Опишіть, який звіт потрібно доробити та які саме зміни очікуєте.
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 sm:items-baseline p-4 sm:px-5">
@@ -212,33 +260,37 @@ export const DesignShowcase = () => {
         <h2 className="text-xl font-bold text-[#1E1712] mb-5">Кнопки</h2>
         <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 space-y-4">
           <div className="flex flex-wrap gap-3 items-center">
-            <button className="text-xs sm:text-sm font-semibold text-white bg-[#E8663B] hover:bg-[#C7522F] border border-[#E8663B] rounded-xl px-4 h-9 shadow-sm transition-colors">
+            <button
+              type="button"
+              className="text-xs sm:text-sm font-semibold text-white bg-[#E8663B] hover:bg-[#C7522F] border border-[#E8663B] rounded-xl px-4 h-9 shadow-sm transition-colors cursor-pointer"
+            >
               Подати запит
             </button>
-            <button className="text-xs sm:text-sm font-semibold text-[#1E1712] bg-white hover:bg-[#F5EFE9] border border-[#DED4CA] rounded-xl px-4 h-9 transition-colors">
+            <button
+              type="button"
+              className="text-xs sm:text-sm font-semibold text-[#1E1712] bg-white hover:bg-[#F5EFE9] border border-[#DED4CA] rounded-xl px-4 h-9 transition-colors cursor-pointer"
+            >
               Зберегти чернетку
             </button>
-            <button className="text-xs sm:text-sm font-semibold text-[#5A4E45] hover:bg-[#F5EFE9] hover:text-[#1E1712] rounded-xl px-3 h-9 transition-colors">
+            <button
+              type="button"
+              className="text-xs sm:text-sm font-semibold text-[#5A4E45] hover:bg-[#F5EFE9] hover:text-[#1E1712] rounded-xl px-3 h-9 transition-colors cursor-pointer"
+            >
               Скасувати
             </button>
-            <button className="text-xs sm:text-sm font-semibold text-white bg-[#C22B22] hover:bg-[#A31F18] border border-[#C22B22] rounded-xl px-4 h-9 transition-colors">
+            <button
+              type="button"
+              className="text-xs sm:text-sm font-semibold text-white bg-[#C22B22] hover:bg-[#A31F18] border border-[#C22B22] rounded-xl px-4 h-9 transition-colors cursor-pointer"
+            >
               Відхилити
             </button>
-            <button disabled className="text-xs sm:text-sm font-semibold text-[#B5A9A0] bg-[#F5EFE9] border border-[#EDE5DD] rounded-xl px-4 h-9 cursor-not-allowed">
+            <button
+              type="button"
+              disabled
+              className="text-xs sm:text-sm font-semibold text-[#B5A9A0] bg-[#F5EFE9] border border-[#EDE5DD] rounded-xl px-4 h-9 cursor-not-allowed"
+            >
               Недоступно
             </button>
-          </div>
-          <div className="flex flex-wrap gap-3 items-center pt-3 border-t border-[#F2EBE4]">
-            <button className="text-xs font-semibold text-white bg-[#E8663B] hover:bg-[#C7522F] rounded-lg px-3 h-7">
-              sm · В роботу
-            </button>
-            <button className="text-xs font-semibold text-[#1E1712] bg-white hover:bg-[#F5EFE9] border border-[#DED4CA] rounded-lg px-3 h-7">
-              sm · На тріаж
-            </button>
-            <button className="text-sm font-semibold text-white bg-[#E8663B] hover:bg-[#C7522F] rounded-xl px-5 h-11">
-              lg · Погодити доступ
-            </button>
-            <span className="text-xs text-[#8B7D72]">висоти 28 / 36 / 44 px</span>
           </div>
         </div>
       </section>
@@ -252,16 +304,22 @@ export const DesignShowcase = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 space-y-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Назва запиту</label>
+              <label htmlFor={requestNameId} className="text-xs font-semibold text-[#5A4E45]">
+                Назва запиту
+              </label>
               <input
+                id={requestNameId}
                 type="text"
                 placeholder="Коротко, одним рядком"
                 className="text-xs text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-9 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Посилання на звіт</label>
+              <label htmlFor={reportUrlId} className="text-xs font-semibold text-[#5A4E45]">
+                Посилання на звіт
+              </label>
               <input
+                id={reportUrlId}
                 type="text"
                 defaultValue="https://bi.internal/reports/sales-daily"
                 className="font-mono text-xs text-[#1E1712] bg-white border border-[#E8663B] rounded-xl h-9 px-3 outline-none ring-2 ring-[#FDEDE5]"
@@ -269,8 +327,11 @@ export const DesignShowcase = () => {
               <div className="text-[11px] text-[#8B7D72]">Обов'язкове при підтипі «Доробка»</div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Кінцевий термін</label>
+              <label htmlFor={dueDateId} className="text-xs font-semibold text-[#5A4E45]">
+                Кінцевий термін
+              </label>
               <input
+                id={dueDateId}
                 type="text"
                 placeholder="дд.мм.рррр"
                 className="text-xs text-[#1E1712] bg-white border border-[#C22B22] rounded-xl h-9 px-3 outline-none"
@@ -281,8 +342,13 @@ export const DesignShowcase = () => {
 
           <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 space-y-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Сервіс</label>
-              <select className="text-xs text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-9 px-2.5 outline-none focus:border-[#E8663B]">
+              <label htmlFor={serviceSelectId} className="text-xs font-semibold text-[#5A4E45]">
+                Сервіс
+              </label>
+              <select
+                id={serviceSelectId}
+                className="text-xs text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-9 px-2.5 outline-none focus:border-[#E8663B]"
+              >
                 <option>Створення звіт павер бі</option>
                 <option>Отримання доступу до павер бі</option>
                 <option>Створення заявки на номенклатуру</option>
@@ -290,8 +356,11 @@ export const DesignShowcase = () => {
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Опис</label>
+              <label htmlFor={descTextareaId} className="text-xs font-semibold text-[#5A4E45]">
+                Опис
+              </label>
               <textarea
+                id={descTextareaId}
                 rows={3}
                 placeholder="Що саме зламалось або що потрібно зробити"
                 className="text-xs text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl p-2.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] resize-none"
@@ -303,10 +372,11 @@ export const DesignShowcase = () => {
             <div className="text-xs font-semibold text-[#5A4E45]">Оцінка цінності · 1–5</div>
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between text-xs">
-                <span>Business Value</span>
+                <label htmlFor={bvRangeId}>Business Value</label>
                 <span className="font-mono text-[#C7522F] font-semibold">{bv}</span>
               </div>
               <input
+                id={bvRangeId}
                 type="range"
                 min="1"
                 max="5"
@@ -317,10 +387,11 @@ export const DesignShowcase = () => {
             </div>
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between text-xs">
-                <span>Risk / Opportunity</span>
+                <label htmlFor={riskRangeId}>Risk / Opportunity</label>
                 <span className="font-mono text-[#C7522F] font-semibold">{risk}</span>
               </div>
               <input
+                id={riskRangeId}
                 type="range"
                 min="1"
                 max="5"
@@ -331,10 +402,11 @@ export const DesignShowcase = () => {
             </div>
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between text-xs">
-                <span>Time Criticality</span>
+                <label htmlFor={tcRangeId}>Time Criticality</label>
                 <span className="font-mono text-[#C7522F] font-semibold">{tc}</span>
               </div>
               <input
+                id={tcRangeId}
                 type="range"
                 min="1"
                 max="5"
@@ -356,7 +428,7 @@ export const DesignShowcase = () => {
         <div className="font-mono text-xs uppercase tracking-widest text-[#8B7D72] mb-1">
           05 · Стани та матриця
         </div>
-        <h2 className="text-xl font-bold text-[#1E1712] mb-5">Бейджі пріоритету, 12 статусів і матриця Impact × Urgency</h2>
+        <h2 className="text-xl font-bold text-[#1E1712] mb-5">Бейджі пріоритету та матриця Impact × Urgency</h2>
         <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 space-y-6">
           <div className="space-y-3">
             <div className="text-xs font-semibold text-[#5A4E45]">Пріоритет P1–P4</div>
@@ -377,33 +449,6 @@ export const DesignShowcase = () => {
           </div>
 
           <div className="space-y-3 pt-4 border-t border-[#F2EBE4]">
-            <div className="text-xs font-semibold text-[#5A4E45]">12 Статусів заявки</div>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { name: 'Новий', color: 'text-[#245A87] bg-[#E7F0F8] border-[#CBDFEE]' },
-                { name: 'Підготовка ТЗ', color: 'text-[#5D4483] bg-[#F0EAF8] border-[#DDD0EE]' },
-                { name: 'Очікує погодження', color: 'text-[#8A5E0C] bg-[#FBF1DE] border-[#EEDDB6]' },
-                { name: 'Погоджено', color: 'text-[#1F5D45] bg-[#E5F3ED] border-[#C6E3D6]' },
-                { name: 'Тріаж', color: 'text-[#96491F] bg-[#FBEBE1] border-[#F0D5C2]' },
-                { name: 'Оцінка / WSJF', color: 'text-[#38457F] bg-[#EAECF8] border-[#D2D7EE]' },
-                { name: 'В роботі', color: 'text-[#175C69] bg-[#E3F1F4] border-[#C4E2E8]' },
-                { name: 'Тестування', color: 'text-[#6B3B7B] bg-[#F4E9F8] border-[#E4CFEE]' },
-                { name: 'UAT', color: 'text-[#235F54] bg-[#E4F1EE] border-[#C4E1DA]' },
-                { name: 'Вирішено', color: 'text-[#2C5F22] bg-[#EAF3E6] border-[#D0E4C8]' },
-                { name: 'Закрито', color: 'text-[#6A5D53] bg-[#F1ECE7] border-[#E1D8D0]' },
-                { name: 'Відхилено', color: 'text-[#8E1F19] bg-[#FBE8E6] border-[#F3CFCB]' },
-              ].map((s) => (
-                <span
-                  key={s.name}
-                  className={`text-xs font-semibold border rounded-lg px-2.5 py-1 ${s.color}`}
-                >
-                  {s.name}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-3 pt-4 border-t border-[#F2EBE4]">
             <div className="text-xs font-semibold text-[#5A4E45]">
               Матриця Impact × Urgency ➔ Пріоритет
             </div>
@@ -415,14 +460,16 @@ export const DesignShowcase = () => {
                 <div className="text-[11px] text-[#8B7D72] text-center">Низька</div>
 
                 {impacts.map(([iKey, iLabel]) => (
-                  <div key={iKey} className="contents">
+                  <React.Fragment key={iKey}>
                     <div className="text-[11px] text-[#8B7D72] flex items-center justify-end pr-2 font-medium">
                       {iLabel}
                     </div>
                     {urgencies.map((uKey) => {
-                      const p = sev(iKey, uKey);
-                      const t = tone[p];
-                      const sel = impact === iKey && urgency === uKey;
+                      const p = getPriorityFromMatrix(iKey, uKey);
+                      const t = tones[p];
+                      const isSelected = impact === iKey && urgency === uKey;
+                      const borderStyle = isSelected ? t[1] : t[2];
+                      const ringClass = isSelected ? 'ring-2 ring-[#E8663B] shadow-sm' : '';
                       return (
                         <button
                           key={`${iKey}-${uKey}`}
@@ -431,16 +478,18 @@ export const DesignShowcase = () => {
                             setImpact(iKey);
                             setUrgency(uKey);
                           }}
-                          className={`h-11 rounded-lg font-mono text-xs font-semibold flex items-center justify-center transition-all ${
-                            sel ? 'ring-2 ring-[#E8663B] shadow-sm' : ''
-                          }`}
-                          style={{ backgroundColor: t[0], color: t[1], border: `1px solid ${sel ? t[1] : t[2]}` }}
+                          className={`h-11 rounded-lg font-mono text-xs font-semibold flex items-center justify-center transition-all cursor-pointer ${ringClass}`}
+                          style={{
+                            backgroundColor: t[0],
+                            color: t[1],
+                            border: `1px solid ${borderStyle}`,
+                          }}
                         >
                           {p}
                         </button>
                       );
                     })}
-                  </div>
+                  </React.Fragment>
                 ))}
               </div>
 
@@ -450,10 +499,10 @@ export const DesignShowcase = () => {
                 </div>
                 <div className="text-xs text-[#5A4E45]">
                   Impact: {impacts.find((i) => i[0] === impact)?.[1]} · Urgency:{' '}
-                  {urgency === 'high' ? 'Висока' : urgency === 'mid' ? 'Середня' : 'Низька'}
+                  {getUrgencyLabel(urgency)}
                 </div>
                 <div className="text-xl font-bold text-[#1E1712]">
-                  {sev(impact, urgency)} · {pLabels[sev(impact, urgency)]}
+                  {currentPriority} · {priorityLabels[currentPriority]}
                 </div>
               </div>
             </div>
@@ -472,43 +521,32 @@ export const DesignShowcase = () => {
             Горизонтальний · гілка A / B / E (ТЗ ➔ Розробка ➔ UAT)
           </div>
           <div className="flex items-start overflow-x-auto pb-2">
-            {stepDefs.map(([label, st], i) => (
-              <div key={label} className="flex flex-col items-center gap-2 min-w-[96px] flex-1">
-                <div className="flex items-center w-full">
-                  <div
-                    className={`h-0.5 flex-1 ${
-                      i === 0 ? 'bg-transparent' : st !== 0 ? 'bg-[#F9CDB4]' : 'bg-[#EDE5DD]'
-                    }`}
-                  />
-                  <div
-                    className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                      st === 2
-                        ? 'bg-white border-2 border-[#E8663B] ring-4 ring-[#FDEDE5]'
-                        : st === 1
-                        ? 'bg-[#E8663B]'
-                        : 'bg-white border-2 border-[#DED4CA]'
-                    }`}
-                  />
-                  <div
-                    className={`h-0.5 flex-1 ${
-                      i === stepDefs.length - 1 ? 'bg-transparent' : st === 1 ? 'bg-[#F9CDB4]' : 'bg-[#EDE5DD]'
-                    }`}
-                  />
+            {stepDefs.map(([label, stVal], i) => {
+              const st = Number(stVal);
+              const circleClass = getStepCircleClass(st);
+              const textClass = getStepTextClass(st);
+              const leftLineBg = getStepLeftLineBg(i, st);
+              const isLast = i === stepDefs.length - 1;
+              const rightLineBg = getStepRightLineBg(isLast, st);
+
+              return (
+                <div key={label} className="flex flex-col items-center gap-2 min-w-[96px] flex-1">
+                  <div className="flex items-center w-full">
+                    <div className={`h-0.5 flex-1 ${leftLineBg}`} />
+                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${circleClass}`} />
+                    <div className={`h-0.5 flex-1 ${rightLineBg}`} />
+                  </div>
+                  <div className={`text-[11px] text-center px-1 font-medium ${textClass}`}>
+                    {label}
+                  </div>
                 </div>
-                <div
-                  className={`text-[11px] text-center px-1 font-medium ${
-                    st === 2 ? 'font-bold text-[#1E1712]' : st === 1 ? 'text-[#5A4E45]' : 'text-[#8B7D72]'
-                  }`}
-                >
-                  {label}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* 08 · СИСТЕМНІ СТАНИ ТА ТОСТ/МОДАЛКА */}
+      {/* 08 · ЗВОРОТНИЙ ЗВ'ЯЗОК */}
       <section className="pt-8 border-t border-[#EDE5DD]">
         <div className="font-mono text-xs uppercase tracking-widest text-[#8B7D72] mb-1">
           08 · Зворотний зв'язок
@@ -521,20 +559,17 @@ export const DesignShowcase = () => {
               <button
                 type="button"
                 onClick={() => setModalOpen(true)}
-                className="text-xs font-semibold text-[#1E1712] bg-white hover:bg-[#F5EFE9] border border-[#DED4CA] rounded-xl px-4 h-9"
+                className="text-xs font-semibold text-[#1E1712] bg-white hover:bg-[#F5EFE9] border border-[#DED4CA] rounded-xl px-4 h-9 cursor-pointer"
               >
                 Відкрити модалку
               </button>
               <button
                 type="button"
                 onClick={fireToast}
-                className="text-xs font-semibold text-[#1E1712] bg-white hover:bg-[#F5EFE9] border border-[#DED4CA] rounded-xl px-4 h-9"
+                className="text-xs font-semibold text-[#1E1712] bg-white hover:bg-[#F5EFE9] border border-[#DED4CA] rounded-xl px-4 h-9 cursor-pointer"
               >
                 Показати тост
               </button>
-            </div>
-            <div className="text-xs text-[#8B7D72] leading-relaxed">
-              Модалка використовується для відхилення з обов'язковим коментарем або підтверджень. Тост випливає в кутку екрана на 4 секунди.
             </div>
           </div>
 
@@ -553,21 +588,31 @@ export const DesignShowcase = () => {
 
       {/* MODAL */}
       {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-[#1E1712]/40 flex items-center justify-center p-4"
-          onClick={() => setModalOpen(false)}
-        >
-          <div
-            className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 flex flex-col gap-3.5"
-            onClick={(e) => e.stopPropagation()}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Закрити модальне вікно"
+            onClick={() => setModalOpen(false)}
+            className="fixed inset-0 bg-[#1E1712]/40 backdrop-blur-sm cursor-default border-none"
+          />
+          <dialog
+            open
+            aria-labelledby="modal-title"
+            className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 flex flex-col gap-3.5 border-0 m-0 text-left"
           >
             <div className="flex flex-col gap-1">
-              <div className="text-base font-bold text-[#1E1712]">Відхилити заявку?</div>
-              <div className="text-xs text-[#5A4E45]">
+              <h3 id="modal-title" className="text-base font-bold text-[#1E1712]">
+                Відхилити заявку?
+              </h3>
+              <p className="text-xs text-[#5A4E45]">
                 Автор отримає повідомлення. Коментар обов'язковий — він потрапить в аудит-журнал.
-              </div>
+              </p>
             </div>
+            <label htmlFor={modalTextareaId} className="sr-only">
+              Причина відхилення
+            </label>
             <textarea
+              id={modalTextareaId}
               rows={3}
               placeholder="Причина відхилення..."
               className="text-xs text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl p-2.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] resize-none"
@@ -576,19 +621,19 @@ export const DesignShowcase = () => {
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="text-xs font-semibold text-[#5A4E45] hover:bg-[#F5EFE9] rounded-xl px-3.5 h-9"
+                className="text-xs font-semibold text-[#5A4E45] hover:bg-[#F5EFE9] rounded-xl px-3.5 h-9 cursor-pointer"
               >
                 Скасувати
               </button>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="text-xs font-semibold text-white bg-[#C22B22] hover:bg-[#A31F18] rounded-xl px-4 h-9"
+                className="text-xs font-semibold text-white bg-[#C22B22] hover:bg-[#A31F18] rounded-xl px-4 h-9 cursor-pointer"
               >
                 Відхилити
               </button>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
 

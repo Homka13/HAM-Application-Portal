@@ -4,7 +4,7 @@ import { ChangeBoard } from './components/ChangeBoard';
 import { ProblemBoard } from './components/ProblemBoard';
 import { KnowledgeBoard } from './components/KnowledgeBoard';
 import { Dashboard } from './components/Dashboard';
-import { DesignShowcase } from './components/DesignShowcase';
+import { NomenclatureForm } from './components/NomenclatureForm';
 import { useUser } from './context/UserContext';
 
 interface ServiceCatalog {
@@ -131,7 +131,7 @@ function App() {
 
   // UI Navigation & Feedback states
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'incidents' | 'changes' | 'problems' | 'kb' | 'dashboard' | 'design'>('incidents');
+  const [tab, setTab] = useState<'incidents' | 'changes' | 'problems' | 'kb' | 'dashboard'>('incidents');
   const [suggestions, setSuggestions] = useState<{ id: string; title: string; category: string }[]>([]);
   const [filter, setFilter] = useState<'ALL' | 'OVERDUE' | 'HIGH'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -184,6 +184,11 @@ function App() {
       return type === 'INCIDENT' ? isIncident : !isIncident;
     });
   }, [services, type]);
+
+  const isNomenclatureService = useMemo(() => {
+    const selected = services.find((s) => s.id === serviceCatalogId);
+    return selected?.name.includes('номенклатур') || serviceCatalogId === 'srv-3';
+  }, [services, serviceCatalogId]);
 
   const handleTypeChange = (newType: string) => {
     setType(newType);
@@ -430,7 +435,6 @@ function App() {
               { id: 'problems', label: '🔍 Проблеми' },
               { id: 'kb', label: '📚 База знань' },
               { id: 'dashboard', label: '📊 Дашборд' },
-              { id: 'design', label: '🎨 Дизайн-система' },
             ].map((t) => {
               const active = tab === t.id;
               return (
@@ -462,15 +466,26 @@ function App() {
               </h1>
             </div>
 
-            {/* 3. APPLICATION CREATION FORM */}
-            <section className="bg-white border border-[#EDE5DD] rounded-2xl p-6 sm:p-7 shadow-[0_2px_12px_rgba(62,36,23,0.03)] space-y-6">
-              <div className="flex items-center justify-between pb-3 border-b border-[#F2EBE4]">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-2 h-2 rounded-full bg-[#E8663B]" />
-                  <h2 className="text-base font-bold text-[#1E1712]">Створити нову заявку</h2>
+            {/* 3. APPLICATION CREATION FORM OR NOMENCLATURE FORM */}
+            {isNomenclatureService ? (
+              <NomenclatureForm
+                serviceId={serviceCatalogId}
+                onSuccess={(msg) => {
+                  triggerToast(msg);
+                  setServiceCatalogId('');
+                  fetchApplications();
+                }}
+                onCancel={() => setServiceCatalogId('')}
+              />
+            ) : (
+              <section className="bg-white border border-[#EDE5DD] rounded-2xl p-6 sm:p-7 shadow-[0_2px_12px_rgba(62,36,23,0.03)] space-y-6">
+                <div className="flex items-center justify-between pb-3 border-b border-[#F2EBE4]">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2 h-2 rounded-full bg-[#E8663B]" />
+                    <h2 className="text-base font-bold text-[#1E1712]">Створити нову заявку</h2>
+                  </div>
+                  <span className="text-xs font-mono text-[#8B7D72]">WSJF · SLA · ITIL</span>
                 </div>
-                <span className="text-xs font-mono text-[#8B7D72]">WSJF · SLA · ITIL</span>
-              </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Applicant & Email */}
@@ -821,6 +836,7 @@ function App() {
                 </div>
               </form>
             </section>
+            )}
 
             {/* 4. APPLICATIONS TABLE SECTION */}
             <section className="bg-white border border-[#EDE5DD] rounded-2xl overflow-hidden shadow-[0_2px_12px_rgba(62,36,23,0.03)]">
@@ -1038,7 +1054,6 @@ function App() {
         {tab === 'problems' && <ProblemBoard />}
         {tab === 'kb' && <KnowledgeBoard />}
         {tab === 'dashboard' && <Dashboard />}
-        {tab === 'design' && <DesignShowcase />}
       </main>
 
       {/* 5. REJECTION MODAL */}

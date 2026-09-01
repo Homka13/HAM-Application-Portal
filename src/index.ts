@@ -1,9 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import client from 'prom-client';
@@ -24,6 +24,7 @@ const __dirname = path.dirname(__filename);
 import service from '../service.mjs';
 
 const app = express();
+app.disable('x-powered-by');
 
 function getPort(): number {
   if (process.env.PORT && !Number.isNaN(Number(process.env.PORT))) {
@@ -99,7 +100,7 @@ app.use((req, _res, next) => {
   next();
 });
 
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 // Determine frontend dist directory
