@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useId, useMemo } from 'react';
 
 interface NomenclatureFormProps {
   serviceId: string;
@@ -6,207 +6,328 @@ interface NomenclatureFormProps {
   onCancel: () => void;
 }
 
+interface AttachedFile {
+  name: string;
+  size: number;
+  type: string;
+  data: string; // base64
+}
+
 export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
   serviceId,
   onSuccess,
   onCancel,
 }) => {
-  const [applicantName, setApplicantName] = useState('');
-  const [requesterEmail, setRequesterEmail] = useState('');
-  const [department, setDepartment] = useState('');
+  // Field IDs for accessibility & label associations
+  const fullNameId = useId();
+  const shortNameId = useId();
+  const itemTypeId = useId();
+  const unitId = useId();
+  const skuId = useId();
+  const barcodeId = useId();
+  const vatRateId = useId();
+  const uktzedId = useId();
+  const supplierId = useId();
+  const warehouseId = useId();
+  const monthlyRequirementId = useId();
+  const needIncomingControlId = useId();
+  const specLinkId = useId();
+  const commentId = useId();
 
-  // Nomenclature specific fields
+  // --- STATE ---
+  // Section 1: Основні атрибути
   const [fullName, setFullName] = useState('');
   const [shortName, setShortName] = useState('');
   const [itemType, setItemType] = useState('Матеріали');
-  const [unit, setUnit] = useState('шт');
+  const [unit, setUnit] = useState('Штуки (шт)');
   const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState('');
-  const [vatRate, setVatRate] = useState('20%');
+  const [vatRate, setVatRate] = useState('20% (Основна)');
   const [uktzed, setUktzed] = useState('');
+
+  // Section 2: Постачання та склад
   const [supplier, setSupplier] = useState('');
   const [warehouse, setWarehouse] = useState('');
   const [monthlyRequirement, setMonthlyRequirement] = useState('');
+  const [needIncomingControl, setNeedIncomingControl] = useState('Ні');
   const [specLink, setSpecLink] = useState('');
-  const [description, setDescription] = useState('');
+  const [comment, setComment] = useState('');
 
-  // Prioritization
-  const [bv, setBv] = useState(3);
-  const [risk, setRisk] = useState(3);
-  const [tc, setTc] = useState(3);
-  const [dueDate, setDueDate] = useState('');
+  // Attachments
+  const [photo, setPhoto] = useState<AttachedFile | null>(null);
+  const [docFile, setDocFile] = useState<AttachedFile | null>(null);
 
-  const calculatedWsjf = useMemo(() => {
-    return Number((((bv + risk + tc) / 3) * 2).toFixed(1));
-  }, [bv, risk, tc]);
+  // Submission state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successModal, setSuccessModal] = useState<{ open: boolean; requestNum: string }>({
+    open: false,
+    requestNum: '',
+  });
 
-  const priority = useMemo(() => {
-    if (tc >= 4 || bv >= 5) return 'HIGH';
-    if (tc >= 3 || bv >= 3) return 'MEDIUM';
-    return 'LOW';
-  }, [bv, tc]);
+  // Convert File to Base64
+  const fileToBase64 = (file: File): Promise<AttachedFile> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1] || '';
+        resolve({
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          data: base64,
+        });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setter: (file: AttachedFile | null) => void
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setter(null);
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Розмір файлу не повинен перевищувати 10MB.');
+      e.target.value = '';
+      setter(null);
+      return;
+    }
+    try {
+      const parsed = await fileToBase64(file);
+      setter(parsed);
+    } catch {
+      alert('Не вдалося завантажити файл');
+    }
+  };
+
+  // Helper auto-formatting for UKTZED (10 digits)
+  const handleUktzedChange = (val: string) => {
+    const digitsOnly = val.replace(/\D/g, '').slice(0, 10);
+    setUktzed(digitsOnly);
+  };
+
+  // Auto-generate shortName if empty when user finishes typing fullName
+  const handleFullNameBlur = () => {
+    if (!shortName.trim() && fullName.trim()) {
+      setShortName(fullName.slice(0, 40));
+    }
+  };
+
+  const isFormValid = useMemo(() => {
+    const hasFullName = fullName.trim().length >= 3;
+    const hasItemType = itemType.length > 0;
+    const hasUnit = unit.length > 0;
+    const hasVatRate = vatRate.length > 0;
+    return hasFullName && hasItemType && hasUnit && hasVatRate;
+  }, [fullName, itemType, unit, vatRate]);
+
+  const handleReset = () => {
+    setFullName('');
+    setShortName('');
+    setItemType('Матеріали');
+    setUnit('Штуки (шт)');
+    setSku('');
+    setBarcode('');
+    setVatRate('20% (Основна)');
+    setUktzed('');
+    setSupplier('');
+    setWarehouse('');
+    setMonthlyRequirement('');
+    setNeedIncomingControl('Ні');
+    setSpecLink('');
+    setComment('');
+    setPhoto(null);
+    setDocFile(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!isFormValid || isSubmitting) return;
+
+    setIsSubmitting(true);
 
     const payload = {
       nomenclature: {
-        fullName,
-        shortName: shortName || fullName,
+        fullName: fullName.trim(),
+        shortName: shortName.trim() || fullName.trim(),
         itemType,
         unit,
-        sku,
-        barcode,
+        sku: sku.trim(),
+        barcode: barcode.trim(),
         vatRate,
-        uktzed,
-        supplier,
-        warehouse,
-        monthlyRequirement,
-        specLink,
+        uktzed: uktzed.trim(),
+        supplier: supplier.trim(),
+        warehouse: warehouse.trim(),
+        monthlyRequirement: monthlyRequirement.trim(),
+        needIncomingControl: needIncomingControl === 'Так',
+        specLink: specLink.trim(),
+        comment: comment.trim(),
+        photo: photo ? { name: photo.name, size: photo.size, type: photo.type } : null,
+        docFile: docFile ? { name: docFile.name, size: docFile.size, type: docFile.type } : null,
       },
     };
 
-    const formattedDescription = `Створення нової номенклатури: «${fullName}» (${itemType}, од.вим: ${unit}). Постачальник: ${supplier || '—'}, Склад: ${warehouse || '—'}. ${description ? `Коментар: ${description}` : ''}`;
+    const supplierStr = supplier.trim() || '—';
+    const warehouseStr = warehouse.trim() || '—';
+    const uktzedStr = uktzed.trim() || '—';
+    const commentSuffix = comment.trim() ? ` Коментар: ${comment.trim()}` : '';
+    const description = `Створення номенклатури: «${fullName.trim()}» [${itemType}, ${unit}]. Постачальник: ${supplierStr}, Склад: ${warehouseStr}, Вхідний контроль: ${needIncomingControl}, ПДВ: ${vatRate}, УКТЗЕД: ${uktzedStr}.${commentSuffix}`;
 
     try {
       const res = await fetch('/api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          applicantName,
+          applicantName: 'Авторизований користувач ERP',
           type: 'SERVICE_REQUEST',
-          priority,
-          description: formattedDescription,
+          priority: 'MEDIUM',
+          description,
           serviceCatalogId: serviceId,
           formType: 'A',
           subtype: 'Номенклатура',
           payload,
-          requesterEmail: requesterEmail || undefined,
-          bv,
-          r: risk,
-          tc,
-          wsjf: calculatedWsjf,
-          dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+          bv: 3,
+          r: 3,
+          tc: 3,
+          wsjf: 6.0,
         }),
       });
 
       if (!res.ok) {
         const err = await res.json();
-        alert(`Помилка створення заявки: ${err.error || 'Перевірте поля'}`);
+        alert(`Помилка створення заявки: ${err.error || 'Перевірте обов’язкові поля'}`);
+        setIsSubmitting(false);
         return;
       }
 
       const created = await res.json();
-      onSuccess(`Заявку на номенклатуру #${created.id.slice(0, 8)} успішно створено!`);
+      const rawNum = created.id.replace(/\D/g, '').slice(-5);
+      const paddedNum = (rawNum || '00042').padStart(5, '0');
+      setSuccessModal({ open: true, requestNum: paddedNum });
     } catch (err: any) {
-      alert(`Помилка підключення до сервера: ${err.message}`);
+      alert(`Помилка зв'язку з сервером: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const handleModalClose = () => {
+    setSuccessModal({ open: false, requestNum: '' });
+    onSuccess(`Заявку на номенклатуру #${successModal.requestNum} успішно подано та передано в чергу ERP!`);
   };
 
   return (
     <section className="bg-white border border-[#EDE5DD] rounded-2xl p-6 sm:p-7 shadow-[0_2px_12px_rgba(62,36,23,0.03)] space-y-6">
+      {/* 1. HEADER */}
       <div className="flex items-center justify-between pb-3 border-b border-[#F2EBE4] flex-wrap gap-2">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <span className="w-2.5 h-2.5 rounded-full bg-[#E8663B]" />
           <div>
-            <h2 className="text-base font-bold text-[#1E1712]">
-              Створення заявки на нову номенклатуру (ERP / Склад)
-            </h2>
-            <div className="text-[11px] text-[#8B7D72] font-mono">
-              Спеціалізована форма введення матеріальних цінностей та послуг
+            <h2 className="text-base font-bold text-[#1E1712]">Створення нової номенклатури для ERP</h2>
+            <div className="text-[11px] text-[#8B7D72]">
+              Внесення позицій до довідника матеріалів, сировини, товарів та послуг
             </div>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-xs font-semibold text-[#5A4E45] hover:text-[#1E1712] bg-[#F5EFE9] hover:bg-[#EDE5DD] px-3 py-1.5 rounded-xl transition-colors"
-        >
-          Змінити сервіс / Загальна форма
-        </button>
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-mono text-[#8B7D72] bg-[#F5EFE9] px-2.5 py-1 rounded-lg">
+            SLA: 2-4 год
+          </span>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-xs font-semibold text-[#5A4E45] hover:text-[#1E1712] bg-[#F5EFE9] hover:bg-[#EDE5DD] px-3 py-1.5 rounded-xl transition-colors cursor-pointer"
+          >
+            Змінити сервіс
+          </button>
+        </div>
+      </div>
+
+      {/* Обов'язковість полів - підказка */}
+      <div className="flex items-center justify-between p-3 bg-[#FBF8F5] border border-[#EDE5DD] rounded-xl text-xs text-[#5A4E45]">
+        <div className="flex items-center gap-2">
+          <span className="text-[#C22B22] font-bold text-sm leading-none">*</span>
+          <span>Поля, позначені червоною зірочкою, є <strong>обов'язковими</strong> для подачі заявки.</span>
+        </div>
+        <span className="text-[11px] text-[#8B7D72] hidden sm:inline">SSO: автор визначається автоматично</span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* 1. Applicant Details */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#5A4E45]">
-              Ім'я заявника <span className="text-[#C22B22]">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={applicantName}
-              onChange={(e) => setApplicantName(e.target.value)}
-              placeholder="ПІБ співробітника"
-              className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#5A4E45]">Email заявника</label>
-            <input
-              type="email"
-              value={requesterEmail}
-              onChange={(e) => setRequesterEmail(e.target.value)}
-              placeholder="user@company.local"
-              className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B]"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#5A4E45]">Підрозділ / Відділ</label>
-            <input
-              type="text"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              placeholder="напр. Виробництво / Склад"
-              className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B]"
-            />
-          </div>
-        </div>
-
-        {/* 2. Main Nomenclature Details */}
-        <div className="pt-2 border-t border-[#F2EBE4] space-y-4">
-          <div className="text-xs font-bold uppercase tracking-wider text-[#5A4E45] font-mono">
-            Основні атрибути номенклатури
+        {/* ========================================================= */}
+        {/* СЕКЦІЯ 1: ОСНОВНІ АТРИБУТИ НОМЕНКЛАТУРИ                   */}
+        {/* ========================================================= */}
+        <div className="space-y-4">
+          <div className="text-xs font-bold uppercase tracking-wider text-[#5A4E45] font-mono flex items-center gap-1.5">
+            <span>📦</span>
+            <span>Основні атрибути номенклатури</span>
           </div>
 
+          {/* Повна назва та скорочена назва */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">
-                Повна назва номенклатури <span className="text-[#C22B22]">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={fullNameId} className="text-xs font-semibold text-[#1E1712] flex items-center gap-1">
+                  Повна назва номенклатури <span className="text-[#C22B22] font-bold">*</span>
+                </label>
+                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">Обов'язково</span>
+              </div>
               <input
+                id={fullNameId}
                 type="text"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                onBlur={handleFullNameBlur}
                 placeholder="напр. Кабель силовий мідний ВВГнг 3х2.5 мм²"
-                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
+                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] transition-all"
               />
+              <span className="text-[11px] text-[#8B7D72]">
+                Офіційне найменування для договорів, накладних та специфікацій
+              </span>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">
-                Скорочена назва (для накладних)
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={shortNameId} className="text-xs font-semibold text-[#5A4E45]">
+                  Скорочена назва (для накладних)
+                </label>
+                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+              </div>
               <input
+                id={shortNameId}
                 type="text"
                 value={shortName}
                 onChange={(e) => setShortName(e.target.value)}
                 placeholder="напр. ВВГнг 3х2.5"
-                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B]"
+                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] transition-all"
               />
+              <span className="text-[11px] text-[#8B7D72]">
+                Робоча назва для компактного відображення в таблицях та складських ярликах
+              </span>
             </div>
+          </div>
 
+          {/* Вид номенклатури та Одиниця виміру */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">
-                Вид номенклатури <span className="text-[#C22B22]">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={itemTypeId} className="text-xs font-semibold text-[#1E1712] flex items-center gap-1">
+                  Вид номенклатури <span className="text-[#C22B22] font-bold">*</span>
+                </label>
+                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">Обов'язково</span>
+              </div>
               <select
+                id={itemTypeId}
+                required
                 value={itemType}
                 onChange={(e) => setItemType(e.target.value)}
-                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B]"
+                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] transition-all"
               >
                 <option value="Матеріали">Матеріали</option>
                 <option value="Сировина">Сировина</option>
@@ -216,249 +337,380 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
                 <option value="Запасні частини (ЗІП)">Запасні частини (ЗІП)</option>
                 <option value="Послуга">Послуга</option>
                 <option value="Основні засоби (ОЗ)">Основні засоби (ОЗ)</option>
+                <option value="Малоцінні швидкозношувані предмети (МШП)">МШП</option>
               </select>
+              <span className="text-[11px] text-[#8B7D72]">
+                Визначає рахунок бухгалтерського та складського обліку в ERP
+              </span>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">
-                Одиниця виміру <span className="text-[#C22B22]">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={unitId} className="text-xs font-semibold text-[#1E1712] flex items-center gap-1">
+                  Одиниця виміру <span className="text-[#C22B22] font-bold">*</span>
+                </label>
+                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">Обов'язково</span>
+              </div>
               <select
+                id={unitId}
+                required
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
-                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B]"
+                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] transition-all"
               >
-                <option value="шт">Штуки (шт)</option>
-                <option value="кг">Кілограми (кг)</option>
-                <option value="т">Тонни (т)</option>
-                <option value="л">Літри (л)</option>
-                <option value="м">Метри (м)</option>
-                <option value="м²">Метри квадратні (м²)</option>
-                <option value="м³">Метри кубічні (м³)</option>
-                <option value="компл">Комплект (компл)</option>
-                <option value="упак">Упаковка (упак)</option>
-                <option value="палета">Палета</option>
+                <option value="Штуки (шт)">Штуки (шт)</option>
+                <option value="Кілограми (кг)">Кілограми (кг)</option>
+                <option value="Тонни (т)">Тонни (т)</option>
+                <option value="Літри (л)">Літри (л)</option>
+                <option value="Метри (м)">Метри (м)</option>
+                <option value="Метри квадратні (м²)">Метри квадратні (м²)</option>
+                <option value="Метри кубічні (м³)">Метри кубічні (м³)</option>
+                <option value="Комплекти (компл)">Комплекти (компл)</option>
+                <option value="Упаковки (упак)">Упаковки (упак)</option>
+                <option value="Палета">Палета</option>
+                <option value="Послуга">Послуга</option>
               </select>
+              <span className="text-[11px] text-[#8B7D72]">Базова одиниця для списання та інвентаризації</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          {/* Кодифікація: Артикул, Штрихкод, Ставка ПДВ, УКТЗЕД */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Артикул / Каталожний №</label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={skuId} className="text-xs font-semibold text-[#5A4E45]">
+                  Артикул / Каталожний №
+                </label>
+                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+              </div>
               <input
+                id={skuId}
                 type="text"
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
                 placeholder="напр. VVG-3X2.5-NG"
-                className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B]"
+                className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
+              <span className="text-[11px] text-[#8B7D72]">Артикул виробника</span>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Штрихкод (EAN / UPC)</label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={barcodeId} className="text-xs font-semibold text-[#5A4E45]">
+                  Штрихкод (EAN / UPC)
+                </label>
+                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+              </div>
               <input
+                id={barcodeId}
                 type="text"
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 placeholder="4820000000000"
-                className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B]"
+                className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
+              <span className="text-[11px] text-[#8B7D72]">EAN-13 або внутрішній</span>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Ставка ПДВ</label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={vatRateId} className="text-xs font-semibold text-[#1E1712] flex items-center gap-1">
+                  Ставка ПДВ <span className="text-[#C22B22] font-bold">*</span>
+                </label>
+                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">Обов'язково</span>
+              </div>
               <select
+                id={vatRateId}
+                required
                 value={vatRate}
                 onChange={(e) => setVatRate(e.target.value)}
-                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none"
+                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-2.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               >
-                <option value="20%">20% (Основна)</option>
-                <option value="7%">7% (Фарм/Мед)</option>
-                <option value="0%">0% (Експорт)</option>
+                <option value="20% (Основна)">20% (Основна)</option>
+                <option value="7% (Фарм / Медвироби)">7% (Фарм / Медвироби)</option>
+                <option value="0% (Експорт)">0% (Експорт)</option>
                 <option value="Без ПДВ">Без ПДВ</option>
               </select>
+              <span className="text-[11px] text-[#8B7D72]">Для податкового обліку</span>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Код УКТЗЕД</label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={uktzedId} className="text-xs font-semibold text-[#5A4E45]">
+                  Код УКТЗЕД
+                </label>
+                {uktzed.length === 10 ? (
+                  <span className="text-[10px] font-semibold text-[#2C7A5A]">✓ 10 знаків</span>
+                ) : (
+                  <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+                )}
+              </div>
               <input
+                id={uktzedId}
                 type="text"
+                maxLength={10}
                 value={uktzed}
-                onChange={(e) => setUktzed(e.target.value)}
+                onChange={(e) => handleUktzedChange(e.target.value)}
                 placeholder="8544 49 91 00"
-                className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B]"
+                className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
+              <span className="text-[11px] text-[#8B7D72]">10 цифр класифікатора</span>
             </div>
           </div>
         </div>
 
-        {/* 3. Logistics and Supplier */}
-        <div className="pt-2 border-t border-[#F2EBE4] space-y-4">
-          <div className="text-xs font-bold uppercase tracking-wider text-[#5A4E45] font-mono">
-            Постачання та складське зберігання
+        {/* ========================================================= */}
+        {/* СЕКЦІЯ 2: ПОСТАЧАННЯ ТА СКЛАДСЬКЕ ЗБЕРІГАННЯ             */}
+        {/* ========================================================= */}
+        <div className="space-y-4 pt-4 border-t border-[#F2EBE4]">
+          <div className="text-xs font-bold uppercase tracking-wider text-[#5A4E45] font-mono flex items-center gap-1.5">
+            <span>🏭</span>
+            <span>Постачання та складське зберігання</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Основний постачальник / Виробник</label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={supplierId} className="text-xs font-semibold text-[#5A4E45]">
+                  Основний постачальник / Виробник
+                </label>
+                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+              </div>
               <input
+                id={supplierId}
                 type="text"
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
                 placeholder="ТОВ / Завод-виробник"
-                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B]"
+                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
+              <span className="text-[11px] text-[#8B7D72]">Контрагент або бренд</span>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Склад призначення / Цех</label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={warehouseId} className="text-xs font-semibold text-[#5A4E45]">
+                  Склад призначення / Цех
+                </label>
+                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+              </div>
               <input
+                id={warehouseId}
                 type="text"
                 value={warehouse}
                 onChange={(e) => setWarehouse(e.target.value)}
                 placeholder="Головний склад / Цех №1"
-                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B]"
+                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
+              <span className="text-[11px] text-[#8B7D72]">Склад первинного оприбуткування</span>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#5A4E45]">Орієнтовна потреба на місяць</label>
+              <div className="flex items-center justify-between">
+                <label htmlFor={monthlyRequirementId} className="text-xs font-semibold text-[#5A4E45]">
+                  Орієнтовна потреба на місяць
+                </label>
+                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+              </div>
               <input
+                id={monthlyRequirementId}
                 type="text"
                 value={monthlyRequirement}
                 onChange={(e) => setMonthlyRequirement(e.target.value)}
                 placeholder="напр. 500 шт"
-                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B]"
+                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
+              <span className="text-[11px] text-[#8B7D72]">Для планового відділу закупівель</span>
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#5A4E45]">
-              Посилання на технічну специфікацію / паспорт (URL)
-            </label>
-            <input
-              type="url"
-              value={specLink}
-              onChange={(e) => setSpecLink(e.target.value)}
-              placeholder="https://docs.company.local/specs/item-datasheet.pdf"
-              className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B]"
-            />
+          {/* Вхідний контроль (просто Так / Ні) та посилання на даташит */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="flex flex-col gap-1.5 sm:col-span-1">
+              <div className="flex items-center justify-between">
+                <label htmlFor={needIncomingControlId} className="text-xs font-semibold text-[#5A4E45]">
+                  Потрібен вхідний контроль
+                </label>
+              </div>
+              <select
+                id={needIncomingControlId}
+                value={needIncomingControl}
+                onChange={(e) => setNeedIncomingControl(e.target.value)}
+                className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
+              >
+                <option value="Ні">Ні</option>
+                <option value="Так">Так</option>
+              </select>
+              <span className="text-[11px] text-[#8B7D72]">Перевірка якості перед оприбуткуванням</span>
+            </div>
+
+            <div className="flex flex-col gap-1.5 sm:col-span-3">
+              <div className="flex items-center justify-between">
+                <label htmlFor={specLinkId} className="text-xs font-semibold text-[#5A4E45]">
+                  Посилання на технічну специфікацію / паспорт (URL)
+                </label>
+                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+              </div>
+              <input
+                id={specLinkId}
+                type="url"
+                value={specLink}
+                onChange={(e) => setSpecLink(e.target.value)}
+                placeholder="https://docs.company.local/specs/item-datasheet.pdf"
+                className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
+              />
+              <span className="text-[11px] text-[#8B7D72]">
+                Посилання на сайт виробника, креслення або PDF-документацію
+              </span>
+            </div>
           </div>
 
+          {/* Додатковий коментар */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#5A4E45]">
-              Додатковий коментар / Призначення номенклатури
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor={commentId} className="text-xs font-semibold text-[#5A4E45]">
+                Додатковий коментар / Призначення номенклатури
+              </label>
+              <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+            </div>
             <textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              id={commentId}
+              rows={3}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
               placeholder="Вкажіть особливості обліку, умови зберігання або для якого проекту використовується..."
               className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl p-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] resize-none"
             />
+            <span className="text-[11px] text-[#8B7D72]">
+              Будь-які примітки щодо аналогів, температурного режиму або комплектації
+            </span>
           </div>
         </div>
 
-        {/* 4. Prioritization & WSJF */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2 border-t border-[#F2EBE4]">
-          <div className="bg-[#FBF8F5] border border-[#EDE5DD] rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#5A4E45] font-mono">
-                Оцінка цінності (WSJF)
-              </span>
-              <span className="font-mono text-sm font-bold text-[#E8663B] bg-[#FDEDE5] px-2.5 py-0.5 rounded-lg border border-[#F9CDB4]">
-                WSJF {calculatedWsjf}
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-medium text-[#5A4E45]">
-                <span>Business Value (Важливість для виробництва)</span>
-                <span className="font-mono text-[#C7522F] font-bold">{bv}</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="5"
-                value={bv}
-                onChange={(e) => setBv(+e.target.value)}
-                className="w-full accent-[#E8663B]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-medium text-[#5A4E45]">
-                <span>Risk Reduction (Ризик простою)</span>
-                <span className="font-mono text-[#C7522F] font-bold">{risk}</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="5"
-                value={risk}
-                onChange={(e) => setRisk(+e.target.value)}
-                className="w-full accent-[#E8663B]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-medium text-[#5A4E45]">
-                <span>Time Criticality (Терміновість введення)</span>
-                <span className="font-mono text-[#C7522F] font-bold">{tc}</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="5"
-                value={tc}
-                onChange={(e) => setTc(+e.target.value)}
-                className="w-full accent-[#E8663B]"
-              />
-            </div>
+        {/* ========================================================= */}
+        {/* СЕКЦІЯ 3: ФАЙЛИ ТА ФОТО (ПАСПОРТ / ЗОБРАЖЕННЯ)            */}
+        {/* ========================================================= */}
+        <div className="bg-[#FBF8F5] border border-[#EDE5DD] rounded-2xl p-4 sm:p-5 space-y-3">
+          <div className="text-xs font-bold uppercase tracking-wider text-[#5A4E45] font-mono flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <span>📎</span>
+              <span>Прикріплення документів та фото</span>
+            </span>
+            <span className="text-[11px] text-[#8B7D72] font-normal">Необов'язково</span>
           </div>
 
-          <div className="bg-[#FBF8F5] border border-[#EDE5DD] rounded-2xl p-4 flex flex-col justify-between space-y-3">
-            <div className="space-y-2">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#5A4E45] font-mono">
-                Термін створення в системі
-              </div>
-              <input
-                type="datetime-local"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B]"
-              />
-              <div className="text-[11px] text-[#8B7D72]">
-                Орієнтовний термін заведення картки номенклатури в ERP/1C.
-              </div>
+          <div className="flex flex-wrap gap-4 items-center">
+            {/* Фото */}
+            <div className="flex items-center gap-3">
+              <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-[#F5EFE9] text-[#1E1712] border border-[#DED4CA] rounded-xl text-xs font-semibold transition-colors shadow-sm">
+                <span>📸 Фото позиції</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleFileUpload(e, setPhoto)}
+                />
+              </label>
+              <span className={`text-xs ${photo ? 'text-[#2C7A5A] font-semibold' : 'text-[#8B7D72]'}`}>
+                {photo ? `✓ ${photo.name}` : 'Не обрано'}
+              </span>
             </div>
 
-            <div className="p-3 bg-white rounded-xl border border-[#EDE5DD]">
-              <div className="text-xs text-[#5A4E45]">
-                Після подачі заявка пройде стандартний ITSM життєвий цикл (Тріаж ➔ Заведення в 1C/ERP ➔ Підтвердження).
-              </div>
+            {/* Документ */}
+            <div className="flex items-center gap-3">
+              <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-[#F5EFE9] text-[#1E1712] border border-[#DED4CA] rounded-xl text-xs font-semibold transition-colors shadow-sm">
+                <span>📄 Паспорт / Сертифікат (PDF)</span>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx"
+                  className="hidden"
+                  onChange={(e) => handleFileUpload(e, setDocFile)}
+                />
+              </label>
+              <span className={`text-xs ${docFile ? 'text-[#2C7A5A] font-semibold' : 'text-[#8B7D72]'}`}>
+                {docFile ? `✓ ${docFile.name}` : 'Не обрано'}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* 5. Submit Action */}
-        <div className="flex gap-3 items-center pt-2">
+        {/* ========================================================= */}
+        {/* ДІЇ ТА ВІДПРАВКА                                          */}
+        {/* ========================================================= */}
+        <div className="flex items-center gap-3 pt-2">
           <button
             type="submit"
-            className="text-sm font-semibold text-white bg-[#E8663B] hover:bg-[#C7522F] border border-[#E8663B] rounded-xl px-6 h-10 shadow-sm transition-colors cursor-pointer"
+            disabled={!isFormValid || isSubmitting}
+            className={`text-sm font-semibold rounded-xl px-6 h-10 shadow-sm transition-all flex items-center justify-center gap-2 ${
+              isFormValid && !isSubmitting
+                ? 'bg-[#E8663B] hover:bg-[#C7522F] text-white cursor-pointer active:scale-98'
+                : 'bg-[#F5EFE9] text-[#B5A9A0] border border-[#EDE5DD] cursor-not-allowed'
+            }`}
           >
-            Подати заявку на номенклатуру
+            {(() => {
+              if (isSubmitting) {
+                return (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    Створення...
+                  </span>
+                );
+              }
+              if (isFormValid) {
+                return '💾 Створити заявку на номенклатуру';
+              }
+              return 'Заповніть обов’язкові поля (*)';
+            })()}
           </button>
+
           <button
             type="button"
-            onClick={onCancel}
-            className="text-sm font-semibold text-[#5A4E45] hover:bg-[#F5EFE9] hover:text-[#1E1712] rounded-xl px-4 h-10 transition-colors"
+            onClick={handleReset}
+            className="text-sm font-semibold text-[#5A4E45] hover:bg-[#F5EFE9] hover:text-[#1E1712] rounded-xl px-4 h-10 transition-colors cursor-pointer"
           >
-            Скасувати
+            Очистити
           </button>
         </div>
       </form>
+
+      {/* МОДАЛЬНЕ ВІКНО ПІДТВЕРДЖЕННЯ */}
+      {successModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Закрити модальне вікно"
+            onClick={handleModalClose}
+            className="fixed inset-0 bg-[#1E1712]/40 backdrop-blur-sm cursor-default border-none"
+          />
+          <dialog
+            open
+            aria-labelledby="success-modal-title"
+            className="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 text-center space-y-4 border-0 m-0"
+          >
+            <div className="w-12 h-12 rounded-full bg-[#EAF5EE] border border-[#CDE9D7] text-[#2C7A5A] flex items-center justify-center text-xl mx-auto">
+              ✓
+            </div>
+            <div className="space-y-1.5">
+              <h3 id="success-modal-title" className="text-base font-bold text-[#1E1712]">
+                Заявку на номенклатуру створено!
+              </h3>
+              <p className="text-sm text-[#5A4E45] leading-relaxed">
+                Ваш запит №{' '}
+                <span className="font-mono font-bold text-[#E8663B] text-base">#{successModal.requestNum}</span>
+                <br />
+                успішно зареєстровано в черзі опрацювання ERP.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleModalClose}
+              className="w-full h-10 bg-[#E8663B] hover:bg-[#C7522F] text-white font-bold text-sm rounded-xl transition-colors cursor-pointer"
+            >
+              OK
+            </button>
+          </dialog>
+        </div>
+      )}
     </section>
   );
 };
