@@ -133,14 +133,43 @@ const DB_FILE = path.join(process.cwd(), 'data', 'local-db.json');
 
 let memoryDb: LocalDatabase | null = null;
 
+function mergeDb(current: LocalDatabase | null, disk: LocalDatabase): LocalDatabase {
+  if (!current) return disk;
+
+  const appMap = new Map<string, LocalApplication>();
+  for (const a of disk.applications || []) appMap.set(a.id, a);
+  for (const a of current.applications || []) {
+    if (!appMap.has(a.id)) {
+      appMap.set(a.id, a);
+    }
+  }
+
+  const logMap = new Map<string, LocalAuditLog>();
+  for (const l of disk.auditLogs || []) logMap.set(l.id, l);
+  for (const l of current.auditLogs || []) {
+    if (!logMap.has(l.id)) {
+      logMap.set(l.id, l);
+    }
+  }
+
+  return {
+    services: DEFAULT_SERVICES,
+    applications: Array.from(appMap.values()),
+    auditLogs: Array.from(logMap.values()),
+    changes: disk.changes?.length ? disk.changes : current.changes,
+    problems: disk.problems?.length ? disk.problems : current.problems,
+    articles: disk.articles?.length ? disk.articles : current.articles,
+  };
+}
+
 function loadDb(): LocalDatabase {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     try {
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         if (raw.trim()) {
           const data = JSON.parse(raw);
-          memoryDb = {
+          const diskDb: LocalDatabase = {
             services: DEFAULT_SERVICES,
             applications: data.applications || [],
             auditLogs: data.auditLogs || [],
@@ -148,12 +177,12 @@ function loadDb(): LocalDatabase {
             problems: data.problems || [],
             articles: data.articles?.length ? data.articles : DEFAULT_ARTICLES,
           };
+          memoryDb = mergeDb(memoryDb, diskDb);
           return memoryDb;
         }
       }
     } catch {
-      // transient read contention during test runs, retry briefly
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
     }
   }
 
@@ -176,17 +205,14 @@ function loadDb(): LocalDatabase {
 
 function saveDb(data: LocalDatabase): void {
   memoryDb = data;
-  try {
-    const dir = path.dirname(DB_FILE);
-    fs.mkdirSync(dir, { recursive: true });
-    const tmpFile = `${DB_FILE}.tmp.${process.pid}.${Date.now()}`;
-    fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2), 'utf-8');
-    fs.renameSync(tmpFile, DB_FILE);
-  } catch (err) {
+  const dir = path.dirname(DB_FILE);
+  fs.mkdirSync(dir, { recursive: true });
+  for (let attempt = 0; attempt < 5; attempt++) {
     try {
       fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
-    } catch (fallbackErr) {
-      console.error('Failed to persist local DB:', fallbackErr);
+      return;
+    } catch {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
     }
   }
 }
