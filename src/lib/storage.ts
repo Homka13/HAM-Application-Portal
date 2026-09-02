@@ -131,20 +131,35 @@ const DEFAULT_ARTICLES: LocalArticle[] = [
 
 const DB_FILE = path.join(process.cwd(), 'data', 'local-db.json');
 
+let memoryDb: LocalDatabase | null = null;
+
 function loadDb(): LocalDatabase {
-  try {
-    if (fs.existsSync(DB_FILE)) {
-      const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
-      return {
-        services: DEFAULT_SERVICES,
-        applications: data.applications || [],
-        auditLogs: data.auditLogs || [],
-        changes: data.changes || [],
-        problems: data.problems || [],
-        articles: data.articles?.length ? data.articles : DEFAULT_ARTICLES,
-      };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (fs.existsSync(DB_FILE)) {
+        const raw = fs.readFileSync(DB_FILE, 'utf-8');
+        if (raw.trim()) {
+          const data = JSON.parse(raw);
+          memoryDb = {
+            services: DEFAULT_SERVICES,
+            applications: data.applications || [],
+            auditLogs: data.auditLogs || [],
+            changes: data.changes || [],
+            problems: data.problems || [],
+            articles: data.articles?.length ? data.articles : DEFAULT_ARTICLES,
+          };
+          return memoryDb;
+        }
+      }
+    } catch {
+      // transient read contention during test runs, retry briefly
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
     }
-  } catch {}
+  }
+
+  if (memoryDb) {
+    return memoryDb;
+  }
 
   const initial: LocalDatabase = {
     services: DEFAULT_SERVICES,
@@ -154,16 +169,25 @@ function loadDb(): LocalDatabase {
     problems: [],
     articles: DEFAULT_ARTICLES,
   };
+  memoryDb = initial;
   saveDb(initial);
   return initial;
 }
 
 function saveDb(data: LocalDatabase): void {
+  memoryDb = data;
   try {
-    fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    const dir = path.dirname(DB_FILE);
+    fs.mkdirSync(dir, { recursive: true });
+    const tmpFile = `${DB_FILE}.tmp.${process.pid}.${Date.now()}`;
+    fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(tmpFile, DB_FILE);
   } catch (err) {
-    console.error('Failed to persist local DB:', err);
+    try {
+      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (fallbackErr) {
+      console.error('Failed to persist local DB:', fallbackErr);
+    }
   }
 }
 
