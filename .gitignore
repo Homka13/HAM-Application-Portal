@@ -11,7 +11,5 @@ bun.lock
 bun.lockb
 data/
 index.js
-
-
-
+.agents/
 
