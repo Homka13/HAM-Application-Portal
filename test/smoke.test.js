@@ -1,3 +1,4 @@
+import './webhook-security.test.js';
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, it, before, after } from 'node:test';
@@ -28,6 +29,7 @@ describe('Local Build & Smoke Tests', () => {
         {
           env: {
             ...process.env,
+            NODE_ENV: 'production',
             PORT: String(TEST_PORT),
             DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/ham_test',
           },
@@ -63,7 +65,11 @@ describe('Local Build & Smoke Tests', () => {
 
     after(() => {
       if (serverProcess) {
-        serverProcess.kill('SIGTERM');
+        try { serverProcess.stdout?.destroy(); } catch {}
+        try { serverProcess.stderr?.destroy(); } catch {}
+        try {
+          serverProcess.kill('SIGTERM');
+        } catch {}
       }
     });
 
