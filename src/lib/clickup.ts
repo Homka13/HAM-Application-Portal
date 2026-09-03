@@ -99,14 +99,14 @@ export function isClickUpConfigured(): boolean {
 }
 
 export function generateClickUpSignature(payload: any, secret: string): string {
-  const data = typeof payload === 'string' ? payload : (Buffer.isBuffer(payload) ? payload.toString('utf8') : JSON.stringify(payload));
+  const data = Buffer.isBuffer(payload) ? payload : (typeof payload === 'string' ? payload : JSON.stringify(payload));
   return crypto.createHmac('sha256', secret).update(data).digest('hex');
 }
 
 export function verifyClickUpSignature(payload: any, signature?: string | null, secret?: string | null): boolean {
   if (!signature || !secret) return false;
   try {
-    const rawData = typeof payload === 'string' ? payload : (Buffer.isBuffer(payload) ? payload.toString('utf8') : JSON.stringify(payload));
+    const rawData = Buffer.isBuffer(payload) ? payload : (typeof payload === 'string' ? payload : JSON.stringify(payload));
     const computed = crypto.createHmac('sha256', secret).update(rawData).digest('hex');
     const signatureBuffer = Buffer.from(signature, 'hex');
     const computedBuffer = Buffer.from(computed, 'hex');
@@ -309,29 +309,56 @@ export async function handleInboundClickUpWebhook(
   rawBody?: string | Buffer
 ): Promise<WebhookResult> {
   const { webhookSecret } = getClickUpConfig();
+  const secret = webhookSecret ? webhookSecret.trim() : '';
 
-  // 1. Signature Verification
-  if (webhookSecret) {
-    if (!signature) {
-      return { statusCode: 401, success: false, error: 'Missing x-signature header' };
+  // 1. Signature Verification (Fail-Closed)
+  if (!secret) {
+    return { statusCode: 503, success: false, error: 'CLICKUP_WEBHOOK_SECRET is not configured' };
+  }
+
+  if (!signature) {
+    return { statusCode: 401, success: false, error: 'Missing signature header' };
+  }
+
+  const bodyToVerify = rawBody !== undefined ? rawBody : payload;
+  const isValid = verifyClickUpSignature(bodyToVerify, signature, secret);
+  if (!isValid) {
+    return { statusCode: 401, success: false, error: 'Invalid HMAC signature' };
+  }
+
+  let data: any = payload;
+  if (data === undefined || data === null) {
+    if (rawBody !== undefined && rawBody !== null) {
+      const rawStr = Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : String(rawBody);
+      try {
+        data = JSON.parse(rawStr);
+      } catch {
+        return { statusCode: 400, success: false, error: 'Invalid JSON payload' };
+      }
     }
-
-    const bodyToVerify = rawBody || payload;
-    const isValid = verifyClickUpSignature(bodyToVerify, signature, webhookSecret);
-    if (!isValid) {
-      return { statusCode: 401, success: false, error: 'Invalid HMAC signature' };
+  } else if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return { statusCode: 400, success: false, error: 'Invalid JSON payload' };
+    }
+  } else if (Buffer.isBuffer(data)) {
+    try {
+      data = JSON.parse(data.toString('utf8'));
+    } catch {
+      return { statusCode: 400, success: false, error: 'Invalid JSON payload' };
     }
   }
 
   // 2. Validate payload structure
-  if (!payload || !payload.task_id) {
+  if (!data || typeof data !== 'object' || !data.task_id) {
     return { statusCode: 400, success: false, error: 'Missing task_id in webhook payload' };
   }
 
   // 3. Extract status from payload or history_items
-  let clickupStatus = payload.status;
-  if (!clickupStatus && Array.isArray(payload.history_items)) {
-    const statusItem = payload.history_items.find((item: any) => item.field === 'status');
+  let clickupStatus = data.status;
+  if (!clickupStatus && Array.isArray(data.history_items)) {
+    const statusItem = data.history_items.find((item: any) => item.field === 'status');
     if (statusItem?.after?.status) {
       clickupStatus = statusItem.after.status;
     }
@@ -348,14 +375,14 @@ export async function handleInboundClickUpWebhook(
   }
 
   // 5. Check outbound echo
-  if (isRecentOutboundEcho(payload.task_id, clickupStatus)) {
+  if (isRecentOutboundEcho(data.task_id, clickupStatus)) {
     return { statusCode: 200, success: true, message: 'Status update originated from portal (echo ignored)' };
   }
 
   // 6. Find target application
-  const targetApp = await findApplicationByClickUpTaskId(payload.task_id);
+  const targetApp = await findApplicationByClickUpTaskId(data.task_id);
   if (!targetApp) {
-    return { statusCode: 404, success: false, error: `Application not found for ClickUp task ${payload.task_id}` };
+    return { statusCode: 404, success: false, error: `Application not found for ClickUp task ${data.task_id}` };
   }
 
   // 7. Idempotency check
@@ -364,7 +391,7 @@ export async function handleInboundClickUpWebhook(
   }
 
   // 8. Deduplication check
-  const dedup = processWebhookWithDedup(payload.task_id, targetPortalStatus);
+  const dedup = processWebhookWithDedup(data.task_id, targetPortalStatus);
   if (dedup.duplicate) {
     return { statusCode: 200, success: true, message: 'Duplicate webhook event suppressed' };
   }
