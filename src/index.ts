@@ -104,7 +104,11 @@ app.use((req, _res, next) => {
 });
 
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    (req as any).rawBody = buf;
+  },
+}));
 
 // Determine frontend dist directory
 const possibleDistPaths = [
