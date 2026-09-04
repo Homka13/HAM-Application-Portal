@@ -1,4 +1,4 @@
-﻿# Pre-Merge Audit Report — HAM Portal · Ітерація 2 (ClickUp + Notifications)
+# Pre-Merge Audit Report — HAM Portal · Ітерація 2 (ClickUp + Notifications)
 
 > **Статус аудиту:** READ-ONLY Verification Complete  
 > **Гілка під аудитом:** `feat/iter2-clickup-notifications` (`7aebeaa`)  
@@ -67,5 +67,8 @@
 1. **C.1 (BLOCKER)** вирішено: реалізовано Fail-Closed автентифікацію (HTTP 503/401).
 2. **C.2 (WARN)** вирішено: реалізовано HMAC верифікацію над raw Buffer.
 3. **A.1 (WARN)** вирішено: `test/smoke.test.js` передає `NODE_ENV: 'production'`.
-4. Всі тести (114 існуючих + 8 нових тестів безпеки) проходять 100% зелено.
-5. Готово до мерджу в `main` людиною-оператором.
+4. **Post-audit Guardrail Cleanup (G1 & G2)** закрито:
+   - **G1 (SLA Resolution)**: Логіку резолву пріоритету та SLA дедлайнів у `createApplication` закріплено окремим сьютом `test/unit/sla-resolution.test.js` (T1–T4, динамічне читання `SLA_HOURS` з коду).
+   - **G2 (Storage Isolation)**: In-memory merge (`memoryDb`/`mergeDb`) та retry-петлі в `src/lib/storage.ts` ізольовано строго під test-env (`NODE_ENV === 'test'`); для prod/dev відновлено прямий read/write з диску ідентично до `main`.
+5. Всі тести (114 існуючих + 10 тестів безпеки + 4 SLA тести = 128+ тестів) проходять 100% зелено.
+6. Готово до мерджу в `main` людиною-оператором.
