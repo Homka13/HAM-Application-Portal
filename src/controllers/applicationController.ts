@@ -1,7 +1,35 @@
 import { Request, Response } from 'express';
+import { EventEmitter } from 'node:events';
 import { db } from '../config/db';
 import { NotFoundError, ValidationError } from '../errors';
 import { localStore } from '../lib/storage';
+
+export interface StatusTransitionEvent {
+  app: any;
+  from: string | null;
+  to: string;
+  actorRole?: string;
+  changedBy?: string;
+  resolutionNote?: string;
+  rejectionReason?: string;
+  timestamp: string;
+}
+
+export const appEvents = new EventEmitter();
+appEvents.setMaxListeners(50);
+appEvents.on('error', (err) => {
+  console.error('[appEvents error]', err);
+});
+(globalThis as any).__appEvents = appEvents;
+
+function emitStatusTransition(event: StatusTransitionEvent): void {
+  try {
+    appEvents.emit('application:status_changed', event);
+    appEvents.emit('statusTransition', event);
+  } catch (err) {
+    console.error('[appEvents emit error]', err);
+  }
+}
 
 const SLA_HOURS: Record<string, number> = {
   CRITICAL: 1,
@@ -116,14 +144,15 @@ export const createApplication = async (req: Request, res: Response): Promise<vo
     }
   }
 
-  const hours = SLA_HOURS[priority] ?? 72;
+  const resolvedPriority = priority || computedPriority || 'MEDIUM';
+  const hours = SLA_HOURS[resolvedPriority] ?? 72;
   const slaDeadline = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 
   try {
     const application = await db.orm.public.Application.create({
       applicantName,
       type: resolvedType,
-      priority,
+      priority: resolvedPriority,
       description,
       slaDeadline,
       serviceCatalogId: serviceCatalogId ?? null,
@@ -145,12 +174,22 @@ export const createApplication = async (req: Request, res: Response): Promise<vo
       dueDate: dueDate ? new Date(dueDate).toISOString() : null,
       clickupTaskId: clickupTaskId ?? null,
     });
+
+    emitStatusTransition({
+      app: application,
+      from: null,
+      to: 'NEW',
+      actorRole: (req.user as any)?.role || (req.body as any)?.actorRole || 'USER',
+      changedBy: (req.user as any)?.email || (req.body as any)?.changedBy,
+      timestamp: new Date().toISOString(),
+    });
+
     res.status(201).json(application);
   } catch {
     const application = localStore.createApplication({
       applicantName,
       type: resolvedType,
-      priority,
+      priority: resolvedPriority,
       description,
       slaDeadline,
       serviceCatalogId,
@@ -172,17 +211,38 @@ export const createApplication = async (req: Request, res: Response): Promise<vo
       dueDate: dueDate ? new Date(dueDate).toISOString() : null,
       clickupTaskId,
     });
+
+    emitStatusTransition({
+      app: application,
+      from: null,
+      to: 'NEW',
+      actorRole: (req.user as any)?.role || (req.body as any)?.actorRole || 'USER',
+      changedBy: (req.user as any)?.email || (req.body as any)?.changedBy,
+      timestamp: new Date().toISOString(),
+    });
+
     res.status(201).json(application);
   }
 };
 
 export const getApplications = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const applications = await db.orm.public.Application
+    const dbApps = await db.orm.public.Application
       .orderBy((a) => a.createdAt.desc())
       .include('service')
       .all();
-    res.status(200).json(applications);
+    const localApps = localStore.getApplications();
+    const appMap = new Map<string, any>();
+    for (const app of localApps || []) {
+      appMap.set(app.id, app);
+    }
+    for (const app of dbApps || []) {
+      appMap.set(app.id, app);
+    }
+    const combined = Array.from(appMap.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    res.status(200).json(combined);
   } catch {
     const applications = localStore.getApplications();
     res.status(200).json(applications);
@@ -193,11 +253,22 @@ export const getApplicationLogs = async (req: Request, res: Response): Promise<v
   const id = req.params.id as string;
 
   try {
-    const logs = await db.orm.public.AuditLog
+    const dbLogs = await db.orm.public.AuditLog
       .where({ applicationId: id })
       .orderBy((l) => l.createdAt.desc())
       .all();
-    res.status(200).json(logs);
+    const localLogs = localStore.getAuditLogs(id);
+    const logMap = new Map<string, any>();
+    for (const log of localLogs || []) {
+      logMap.set(log.id, log);
+    }
+    for (const log of dbLogs || []) {
+      logMap.set(log.id, log);
+    }
+    const combined = Array.from(logMap.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    res.status(200).json(combined);
   } catch {
     const logs = localStore.getAuditLogs(id);
     res.status(200).json(logs);
@@ -208,12 +279,15 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
   const id = req.params.id as string;
   const { status, changedBy, actorRole, resolutionNote, rejectionReason } = req.body;
 
+  let oldStatus: string | null = null;
+  let didTransition = false;
+
   try {
     const result = await db.transaction(async (tx) => {
       const currentApp = await tx.orm.public.Application.where({ id }).first();
 
       if (!currentApp) {
-        throw new NotFoundError('Application not found');
+        throw new Error('NOT_FOUND_IN_DB');
       }
 
       if (currentApp.status === status) {
@@ -237,6 +311,7 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
         console.log(`[Status Update] Application ${id} rejected: ${rejectionReason}`);
       }
 
+      oldStatus = currentApp.status;
       const updatedApp = await tx.orm.public.Application.where({ id }).update({ status });
 
       await tx.orm.public.AuditLog.create({
@@ -247,12 +322,26 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
         changedBy: changedBy || actorRole || 'System',
       });
 
+      didTransition = true;
       return updatedApp;
     });
 
+    if (didTransition && oldStatus !== null) {
+      emitStatusTransition({
+        app: result,
+        from: oldStatus,
+        to: status,
+        actorRole: (req.user as any)?.role || actorRole || 'USER',
+        changedBy: (req.user as any)?.email || changedBy,
+        resolutionNote,
+        rejectionReason,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     res.status(200).json(result);
   } catch (err: any) {
-    if (err instanceof NotFoundError || err instanceof ValidationError) {
+    if (err instanceof ValidationError) {
       throw err;
     }
 
@@ -279,6 +368,7 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
       );
     }
 
+    const previousStatus = currentApp.status;
     const updatedApp = localStore.updateApplication(id, { status });
     localStore.createAuditLog({
       applicationId: id,
@@ -286,6 +376,17 @@ export const updateApplicationStatus = async (req: Request, res: Response): Prom
       oldValue: currentApp.status,
       newValue: status,
       changedBy: changedBy || actorRole || 'System',
+    });
+
+    emitStatusTransition({
+      app: updatedApp,
+      from: previousStatus,
+      to: status,
+      actorRole: (req.user as any)?.role || actorRole || 'USER',
+      changedBy: (req.user as any)?.email || changedBy,
+      resolutionNote,
+      rejectionReason,
+      timestamp: new Date().toISOString(),
     });
 
     res.status(200).json(updatedApp);
@@ -309,4 +410,15 @@ export const linkProblemToApplication = async (req: Request, res: Response): Pro
     }
     res.status(200).json(updated);
   }
+};
+
+(globalThis as any).__applicationController = {
+  createApplication,
+  updateApplicationStatus,
+  getApplications,
+  getApplicationLogs,
+  linkProblemToApplication,
+  getAllowedTransitions,
+  getBranchForApp,
+  appEvents,
 };

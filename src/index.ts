@@ -14,8 +14,11 @@ import changeRoutes from './routes/changeRoutes';
 import problemRoutes from './routes/problemRoutes';
 import knowledgeRoutes from './routes/knowledgeRoutes';
 import reportRoutes from './routes/reportRoutes';
+import webhookRoutes from './routes/webhookRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initSlaEscalation } from './cronJobs';
+import { initClickUpIntegration } from './lib/clickup';
+import { initNotificationListeners } from './lib/notify';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -101,7 +104,11 @@ app.use((req, _res, next) => {
 });
 
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    (req as any).rawBody = buf;
+  },
+}));
 
 // Determine frontend dist directory
 const possibleDistPaths = [
@@ -123,6 +130,11 @@ app.use('/api/changes', changeRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/api/kb', knowledgeRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/webhooks/clickup', webhookRoutes);
+app.use('/api/webhooks', webhookRoutes);
+
+initClickUpIntegration();
+initNotificationListeners();
 
 async function refreshTicketGauge() {
   try {

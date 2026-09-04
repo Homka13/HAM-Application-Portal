@@ -124,9 +124,22 @@ docker compose up --build
 
 | Variable | Used by | Description |
 | -------- | ------- | ----------- |
-| `DATABASE_URL` | backend | SQLite connection string (e.g. `file:./dev.db`) |
-| `PORT` | backend | API port (default `3000`) |
-| `SLACK_WEBHOOK_URL` | backup | Optional Slack webhook for backup notifications |
+| `DATABASE_URL` | backend | PostgreSQL connection string (or resilient in-memory fallback if omitted) |
+| `PORT` | backend | API port (default `3000`, Render default `10000`) |
+| `CLICKUP_ENABLED` | backend | Toggle ClickUp integration (`true`/`false`, default `true`) |
+| `CLICKUP_API_KEY` | backend | ClickUp Personal API Token for task creation/updates |
+| `CLICKUP_LIST_ID` | backend | Target ClickUp List ID for synchronized tasks |
+| `CLICKUP_WEBHOOK_SECRET` | backend | Secret key for verifying inbound HMAC `x-signature` webhooks |
+| `NOTIFICATIONS_EMAIL_ENABLED` | backend | Toggle email notifications (`true`/`false`, default `true`) |
+| `SMTP_HOST` / `SMTP_PORT` | backend | SMTP server host (e.g. `smtp.gmail.com`) and port (`587`) |
+| `SMTP_USER` / `SMTP_PASS` | backend | SMTP credentials for email dispatch |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | backend | Gmail address and App Password credentials (alternative to SMTP) |
+| `EMAIL_FROM` | backend | Sender email address for outgoing notification emails |
+| `NOTIFICATIONS_SLACK_ENABLED` | backend | Toggle Slack notifications (`true`/`false`, default `true`) |
+| `SLACK_WEBHOOK_URL` | backend | General channel incoming webhook for status broadcast alerts |
+| `SLACK_INCIDENT_WEBHOOK_URL` | backend | Specialized webhook for critical/triage incident on-call alerts |
+| `SLACK_APPROVAL_WEBHOOK_URL` | backend | Specialized webhook for approval lifecycle requests |
+| `SLACK_BOT_TOKEN` | backend | Slack Bot User OAuth Token (`xoxb-...`) for Direct DM lookup by email |
 | `RCLONE_REMOTE` | backup | Optional rclone remote for off-site backup copies |
 
 ## License
