@@ -1,24 +1,54 @@
+/**
+ * @file NomenclatureForm.tsx
+ * @description Specialized ERP Master Data Intake Form component for
+ * registering new nomenclature items, raw materials, equipment, and services
+ * into the enterprise inventory catalog.
+ *
+ * Requirements Addressed:
+ * - Enterprise Catalog Registration: Captures official full and abbreviated
+ *   names, accounting classification, and measurement units.
+ * - Tax & Customs Compliance: Enforces standard Ukrainian VAT rates and validates
+ *   10-digit UKTZED commodity codes.
+ * - Supply Chain Tracking: Collects primary suppliers, target warehouse
+ *   destinations, monthly consumption estimates, and incoming quality control (QC).
+ * - Multi-Asset Attachments: Handles client-side base64 conversion for item
+ *   photographs and technical specification sheets up to 10MB.
+ */
+
 import React, { useState, useId, useMemo } from 'react';
 
+/**
+ * Component properties for the Nomenclature intake workflow.
+ */
 interface NomenclatureFormProps {
   serviceId: string;
   onSuccess: (message: string) => void;
   onCancel: () => void;
 }
 
+/**
+ * Encapsulated file attachment payload with base64 encoded content.
+ */
 interface AttachedFile {
   name: string;
   size: number;
   type: string;
-  data: string; // base64
+  data: string;
 }
 
+/**
+ * NomenclatureForm renders a multi-section form for registering new items
+ * in the enterprise resource planning (ERP) database.
+ *
+ * @param {NomenclatureFormProps} props - Component properties.
+ * @returns {React.ReactElement} The rendered nomenclature intake view.
+ */
 export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
   serviceId,
   onSuccess,
   onCancel,
 }) => {
-  // Field IDs for accessibility & label associations
+  // Stable accessibility IDs for form controls
   const fullNameId = useId();
   const shortNameId = useId();
   const itemTypeId = useId();
@@ -34,8 +64,7 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
   const specLinkId = useId();
   const commentId = useId();
 
-  // --- STATE ---
-  // Section 1: Основні атрибути
+  // Section 1: Core nomenclature attributes
   const [fullName, setFullName] = useState('');
   const [shortName, setShortName] = useState('');
   const [itemType, setItemType] = useState('Матеріали');
@@ -45,7 +74,7 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
   const [vatRate, setVatRate] = useState('20% (Основна)');
   const [uktzed, setUktzed] = useState('');
 
-  // Section 2: Постачання та склад
+  // Section 2: Procurement and warehousing attributes
   const [supplier, setSupplier] = useState('');
   const [warehouse, setWarehouse] = useState('');
   const [monthlyRequirement, setMonthlyRequirement] = useState('');
@@ -53,18 +82,26 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
   const [specLink, setSpecLink] = useState('');
   const [comment, setComment] = useState('');
 
-  // Attachments
+  // Section 3: File attachments
   const [photo, setPhoto] = useState<AttachedFile | null>(null);
   const [docFile, setDocFile] = useState<AttachedFile | null>(null);
 
-  // Submission state
+  // Submission and modal states
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successModal, setSuccessModal] = useState<{ open: boolean; requestNum: string }>({
+  const [successModal, setSuccessModal] = useState<{
+    open: boolean;
+    requestNum: string;
+  }>({
     open: false,
     requestNum: '',
   });
 
-  // Convert File to Base64
+  /**
+   * Converts a user-selected File object into a base64 AttachedFile record.
+   *
+   * @param {File} file - The uploaded binary file.
+   * @returns {Promise<AttachedFile>} Base64 representation of the file.
+   */
   const fileToBase64 = (file: File): Promise<AttachedFile> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -82,42 +119,57 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
     });
   };
 
+  /**
+   * Handles file upload input events, enforcing the 10MB size limit.
+   *
+   * @param {React.ChangeEvent<HTMLInputElement>} event - The file change event.
+   * @param {(file: AttachedFile | null) => void} fileSetter - State updater.
+   */
   const handleFileUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-    setter: (file: AttachedFile | null) => void
-  ) => {
-    const file = e.target.files?.[0];
+    event: React.ChangeEvent<HTMLInputElement>,
+    fileSetter: (file: AttachedFile | null) => void
+  ): Promise<void> => {
+    const file = event.target.files?.[0];
     if (!file) {
-      setter(null);
+      fileSetter(null);
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
       alert('Розмір файлу не повинен перевищувати 10MB.');
-      e.target.value = '';
-      setter(null);
+      event.target.value = '';
+      fileSetter(null);
       return;
     }
     try {
-      const parsed = await fileToBase64(file);
-      setter(parsed);
+      const parsedFile = await fileToBase64(file);
+      fileSetter(parsedFile);
     } catch {
       alert('Не вдалося завантажити файл');
     }
   };
 
-  // Helper auto-formatting for UKTZED (10 digits)
-  const handleUktzedChange = (val: string) => {
-    const digitsOnly = val.replace(/\D/g, '').slice(0, 10);
+  /**
+   * Normalizes UKTZED input to a maximum of 10 digits.
+   *
+   * @param {string} rawValue - Raw user input.
+   */
+  const handleUktzedChange = (rawValue: string): void => {
+    const digitsOnly = rawValue.replace(/\D/g, '').slice(0, 10);
     setUktzed(digitsOnly);
   };
 
-  // Auto-generate shortName if empty when user finishes typing fullName
-  const handleFullNameBlur = () => {
+  /**
+   * Auto-populates shortName from fullName if left blank.
+   */
+  const handleFullNameBlur = (): void => {
     if (!shortName.trim() && fullName.trim()) {
       setShortName(fullName.slice(0, 40));
     }
   };
 
+  /**
+   * Validates presence of mandatory ERP nomenclature fields.
+   */
   const isFormValid = useMemo(() => {
     const hasFullName = fullName.trim().length >= 3;
     const hasItemType = itemType.length > 0;
@@ -126,7 +178,10 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
     return hasFullName && hasItemType && hasUnit && hasVatRate;
   }, [fullName, itemType, unit, vatRate]);
 
-  const handleReset = () => {
+  /**
+   * Resets all form fields to their initial states.
+   */
+  const handleReset = (): void => {
     setFullName('');
     setShortName('');
     setItemType('Матеріали');
@@ -145,8 +200,15 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
     setDocFile(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  /**
+   * Dispatches the nomenclature creation request to the applications API.
+   *
+   * @param {React.FormEvent<HTMLFormElement>} event - Form submit event.
+   */
+  const handleSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ): Promise<void> => {
+    event.preventDefault();
     if (!isFormValid || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -167,19 +229,25 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
         needIncomingControl: needIncomingControl === 'Так',
         specLink: specLink.trim(),
         comment: comment.trim(),
-        photo: photo ? { name: photo.name, size: photo.size, type: photo.type } : null,
-        docFile: docFile ? { name: docFile.name, size: docFile.size, type: docFile.type } : null,
+        photo: photo
+          ? { name: photo.name, size: photo.size, type: photo.type }
+          : null,
+        docFile: docFile
+          ? { name: docFile.name, size: docFile.size, type: docFile.type }
+          : null,
       },
     };
 
     const supplierStr = supplier.trim() || '—';
     const warehouseStr = warehouse.trim() || '—';
     const uktzedStr = uktzed.trim() || '—';
-    const commentSuffix = comment.trim() ? ` Коментар: ${comment.trim()}` : '';
+    const commentSuffix = comment.trim()
+      ? ` Коментар: ${comment.trim()}`
+      : '';
     const description = `Створення номенклатури: «${fullName.trim()}» [${itemType}, ${unit}]. Постачальник: ${supplierStr}, Склад: ${warehouseStr}, Вхідний контроль: ${needIncomingControl}, ПДВ: ${vatRate}, УКТЗЕД: ${uktzedStr}.${commentSuffix}`;
 
     try {
-      const res = await fetch('/api/applications', {
+      const response = await fetch('/api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -198,27 +266,40 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
         }),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        alert(`Помилка створення заявки: ${err.error || 'Перевірте обов’язкові поля'}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        alert(
+          `Помилка створення заявки: ${
+            errorData.error || 'Перевірте обов’язкові поля'
+          }`
+        );
         setIsSubmitting(false);
         return;
       }
 
-      const created = await res.json();
+      const created = await response.json();
       const rawNum = created.id.replace(/\D/g, '').slice(-5);
       const paddedNum = (rawNum || '00042').padStart(5, '0');
       setSuccessModal({ open: true, requestNum: paddedNum });
-    } catch (err: any) {
-      alert(`Помилка зв'язку з сервером: ${err.message}`);
+    } catch (networkError: unknown) {
+      const errorMessage =
+        networkError instanceof Error
+          ? networkError.message
+          : String(networkError);
+      alert(`Помилка зв'язку з сервером: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleModalClose = () => {
+  /**
+   * Closes the confirmation dialog and notifies parent of success.
+   */
+  const handleModalClose = (): void => {
     setSuccessModal({ open: false, requestNum: '' });
-    onSuccess(`Заявку на номенклатуру #${successModal.requestNum} успішно подано та передано в чергу ERP!`);
+    onSuccess(
+      `Заявку на номенклатуру #${successModal.requestNum} успішно подано та передано в чергу ERP!`
+    );
   };
 
   return (
@@ -228,9 +309,12 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
         <div className="flex items-center gap-2.5">
           <span className="w-2.5 h-2.5 rounded-full bg-[#E8663B]" />
           <div>
-            <h2 className="text-base font-bold text-[#1E1712]">Створення нової номенклатури для ERP</h2>
+            <h2 className="text-base font-bold text-[#1E1712]">
+              Створення нової номенклатури для ERP
+            </h2>
             <div className="text-[11px] text-[#8B7D72]">
-              Внесення позицій до довідника матеріалів, сировини, товарів та послуг
+              Внесення позицій до довідника матеріалів, сировини, товарів та
+              послуг
             </div>
           </div>
         </div>
@@ -249,18 +333,25 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
         </div>
       </div>
 
-      {/* Обов'язковість полів - підказка */}
+      {/* Required fields indicator */}
       <div className="flex items-center justify-between p-3 bg-[#FBF8F5] border border-[#EDE5DD] rounded-xl text-xs text-[#5A4E45]">
         <div className="flex items-center gap-2">
-          <span className="text-[#C22B22] font-bold text-sm leading-none">*</span>
-          <span>Поля, позначені червоною зірочкою, є <strong>обов'язковими</strong> для подачі заявки.</span>
+          <span className="text-[#C22B22] font-bold text-sm leading-none">
+            *
+          </span>
+          <span>
+            Поля, позначені червоною зірочкою, є{' '}
+            <strong>обов'язковими</strong> для подачі заявки.
+          </span>
         </div>
-        <span className="text-[11px] text-[#8B7D72] hidden sm:inline">SSO: автор визначається автоматично</span>
+        <span className="text-[11px] text-[#8B7D72] hidden sm:inline">
+          SSO: автор визначається автоматично
+        </span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ========================================================= */}
-        {/* СЕКЦІЯ 1: ОСНОВНІ АТРИБУТИ НОМЕНКЛАТУРИ                   */}
+        {/* SECTION 1: CORE NOMENCLATURE ATTRIBUTES                   */}
         {/* ========================================================= */}
         <div className="space-y-4">
           <div className="text-xs font-bold uppercase tracking-wider text-[#5A4E45] font-mono flex items-center gap-1.5">
@@ -268,21 +359,27 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
             <span>Основні атрибути номенклатури</span>
           </div>
 
-          {/* Повна назва та скорочена назва */}
+          {/* Full name and Short name */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor={fullNameId} className="text-xs font-semibold text-[#1E1712] flex items-center gap-1">
-                  Повна назва номенклатури <span className="text-[#C22B22] font-bold">*</span>
+                <label
+                  htmlFor={fullNameId}
+                  className="text-xs font-semibold text-[#1E1712] flex items-center gap-1"
+                >
+                  Повна назва номенклатури{' '}
+                  <span className="text-[#C22B22] font-bold">*</span>
                 </label>
-                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">Обов'язково</span>
+                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">
+                  Обов'язково
+                </span>
               </div>
               <input
                 id={fullNameId}
                 type="text"
                 required
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                onChange={(event) => setFullName(event.target.value)}
                 onBlur={handleFullNameBlur}
                 placeholder="напр. Кабель силовий мідний ВВГнг 3х2.5 мм²"
                 className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] transition-all"
@@ -294,39 +391,51 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor={shortNameId} className="text-xs font-semibold text-[#5A4E45]">
+                <label
+                  htmlFor={shortNameId}
+                  className="text-xs font-semibold text-[#5A4E45]"
+                >
                   Скорочена назва (для накладних)
                 </label>
-                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+                <span className="text-[10px] text-[#8B7D72]">
+                  Необов'язково
+                </span>
               </div>
               <input
                 id={shortNameId}
                 type="text"
                 value={shortName}
-                onChange={(e) => setShortName(e.target.value)}
+                onChange={(event) => setShortName(event.target.value)}
                 placeholder="напр. ВВГнг 3х2.5"
                 className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] transition-all"
               />
               <span className="text-[11px] text-[#8B7D72]">
-                Робоча назва для компактного відображення в таблицях та складських ярликах
+                Робоча назва для компактного відображення в таблицях та складських
+                ярликах
               </span>
             </div>
           </div>
 
-          {/* Вид номенклатури та Одиниця виміру */}
+          {/* Item type and Unit */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor={itemTypeId} className="text-xs font-semibold text-[#1E1712] flex items-center gap-1">
-                  Вид номенклатури <span className="text-[#C22B22] font-bold">*</span>
+                <label
+                  htmlFor={itemTypeId}
+                  className="text-xs font-semibold text-[#1E1712] flex items-center gap-1"
+                >
+                  Вид номенклатури{' '}
+                  <span className="text-[#C22B22] font-bold">*</span>
                 </label>
-                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">Обов'язково</span>
+                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">
+                  Обов'язково
+                </span>
               </div>
               <select
                 id={itemTypeId}
                 required
                 value={itemType}
-                onChange={(e) => setItemType(e.target.value)}
+                onChange={(event) => setItemType(event.target.value)}
                 className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] transition-all"
               >
                 <option value="Матеріали">Матеріали</option>
@@ -337,7 +446,9 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
                 <option value="Запасні частини (ЗІП)">Запасні частини (ЗІП)</option>
                 <option value="Послуга">Послуга</option>
                 <option value="Основні засоби (ОЗ)">Основні засоби (ОЗ)</option>
-                <option value="Малоцінні швидкозношувані предмети (МШП)">МШП</option>
+                <option value="Малоцінні швидкозношувані предмети (МШП)">
+                  МШП
+                </option>
               </select>
               <span className="text-[11px] text-[#8B7D72]">
                 Визначає рахунок бухгалтерського та складського обліку в ERP
@@ -346,16 +457,22 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor={unitId} className="text-xs font-semibold text-[#1E1712] flex items-center gap-1">
-                  Одиниця виміру <span className="text-[#C22B22] font-bold">*</span>
+                <label
+                  htmlFor={unitId}
+                  className="text-xs font-semibold text-[#1E1712] flex items-center gap-1"
+                >
+                  Одиниця виміру{' '}
+                  <span className="text-[#C22B22] font-bold">*</span>
                 </label>
-                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">Обов'язково</span>
+                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">
+                  Обов'язково
+                </span>
               </div>
               <select
                 id={unitId}
                 required
                 value={unit}
-                onChange={(e) => setUnit(e.target.value)}
+                onChange={(event) => setUnit(event.target.value)}
                 className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] transition-all"
               >
                 <option value="Штуки (шт)">Штуки (шт)</option>
@@ -370,79 +487,111 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
                 <option value="Палета">Палета</option>
                 <option value="Послуга">Послуга</option>
               </select>
-              <span className="text-[11px] text-[#8B7D72]">Базова одиниця для списання та інвентаризації</span>
+              <span className="text-[11px] text-[#8B7D72]">
+                Базова одиниця для списання та інвентаризації
+              </span>
             </div>
           </div>
 
-          {/* Кодифікація: Артикул, Штрихкод, Ставка ПДВ, УКТЗЕД */}
+          {/* Codification: SKU, Barcode, VAT, UKTZED */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor={skuId} className="text-xs font-semibold text-[#5A4E45]">
+                <label
+                  htmlFor={skuId}
+                  className="text-xs font-semibold text-[#5A4E45]"
+                >
                   Артикул / Каталожний №
                 </label>
-                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+                <span className="text-[10px] text-[#8B7D72]">
+                  Необов'язково
+                </span>
               </div>
               <input
                 id={skuId}
                 type="text"
                 value={sku}
-                onChange={(e) => setSku(e.target.value)}
+                onChange={(event) => setSku(event.target.value)}
                 placeholder="напр. VVG-3X2.5-NG"
                 className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
-              <span className="text-[11px] text-[#8B7D72]">Артикул виробника</span>
+              <span className="text-[11px] text-[#8B7D72]">
+                Артикул виробника
+              </span>
             </div>
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor={barcodeId} className="text-xs font-semibold text-[#5A4E45]">
+                <label
+                  htmlFor={barcodeId}
+                  className="text-xs font-semibold text-[#5A4E45]"
+                >
                   Штрихкод (EAN / UPC)
                 </label>
-                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+                <span className="text-[10px] text-[#8B7D72]">
+                  Необов'язково
+                </span>
               </div>
               <input
                 id={barcodeId}
                 type="text"
                 value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
+                onChange={(event) => setBarcode(event.target.value)}
                 placeholder="4820000000000"
                 className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
-              <span className="text-[11px] text-[#8B7D72]">EAN-13 або внутрішній</span>
+              <span className="text-[11px] text-[#8B7D72]">
+                EAN-13 або внутрішній
+              </span>
             </div>
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor={vatRateId} className="text-xs font-semibold text-[#1E1712] flex items-center gap-1">
+                <label
+                  htmlFor={vatRateId}
+                  className="text-xs font-semibold text-[#1E1712] flex items-center gap-1"
+                >
                   Ставка ПДВ <span className="text-[#C22B22] font-bold">*</span>
                 </label>
-                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">Обов'язково</span>
+                <span className="text-[10px] font-semibold text-[#C22B22] bg-[#FDF0EE] px-1.5 py-0.5 rounded">
+                  Обов'язково
+                </span>
               </div>
               <select
                 id={vatRateId}
                 required
                 value={vatRate}
-                onChange={(e) => setVatRate(e.target.value)}
+                onChange={(event) => setVatRate(event.target.value)}
                 className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-2.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               >
                 <option value="20% (Основна)">20% (Основна)</option>
-                <option value="7% (Фарм / Медвироби)">7% (Фарм / Медвироби)</option>
+                <option value="7% (Фарм / Медвироби)">
+                  7% (Фарм / Медвироби)
+                </option>
                 <option value="0% (Експорт)">0% (Експорт)</option>
                 <option value="Без ПДВ">Без ПДВ</option>
               </select>
-              <span className="text-[11px] text-[#8B7D72]">Для податкового обліку</span>
+              <span className="text-[11px] text-[#8B7D72]">
+                Для податкового обліку
+              </span>
             </div>
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor={uktzedId} className="text-xs font-semibold text-[#5A4E45]">
+                <label
+                  htmlFor={uktzedId}
+                  className="text-xs font-semibold text-[#5A4E45]"
+                >
                   Код УКТЗЕД
                 </label>
                 {uktzed.length === 10 ? (
-                  <span className="text-[10px] font-semibold text-[#2C7A5A]">✓ 10 знаків</span>
+                  <span className="text-[10px] font-semibold text-[#2C7A5A]">
+                    ✓ 10 знаків
+                  </span>
                 ) : (
-                  <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+                  <span className="text-[10px] text-[#8B7D72]">
+                    Необов'язково
+                  </span>
                 )}
               </div>
               <input
@@ -450,17 +599,19 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
                 type="text"
                 maxLength={10}
                 value={uktzed}
-                onChange={(e) => handleUktzedChange(e.target.value)}
+                onChange={(event) => handleUktzedChange(event.target.value)}
                 placeholder="8544 49 91 00"
                 className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
-              <span className="text-[11px] text-[#8B7D72]">10 цифр класифікатора</span>
+              <span className="text-[11px] text-[#8B7D72]">
+                10 цифр класифікатора
+              </span>
             </div>
           </div>
         </div>
 
         {/* ========================================================= */}
-        {/* СЕКЦІЯ 2: ПОСТАЧАННЯ ТА СКЛАДСЬКЕ ЗБЕРІГАННЯ             */}
+        {/* SECTION 2: PROCUREMENT AND WAREHOUSING                    */}
         {/* ========================================================= */}
         <div className="space-y-4 pt-4 border-t border-[#F2EBE4]">
           <div className="text-xs font-bold uppercase tracking-wider text-[#5A4E45] font-mono flex items-center gap-1.5">
@@ -471,91 +622,122 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor={supplierId} className="text-xs font-semibold text-[#5A4E45]">
+                <label
+                  htmlFor={supplierId}
+                  className="text-xs font-semibold text-[#5A4E45]"
+                >
                   Основний постачальник / Виробник
                 </label>
-                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+                <span className="text-[10px] text-[#8B7D72]">
+                  Необов'язково
+                </span>
               </div>
               <input
                 id={supplierId}
                 type="text"
                 value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
+                onChange={(event) => setSupplier(event.target.value)}
                 placeholder="ТОВ / Завод-виробник"
                 className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
-              <span className="text-[11px] text-[#8B7D72]">Контрагент або бренд</span>
+              <span className="text-[11px] text-[#8B7D72]">
+                Контрагент або бренд
+              </span>
             </div>
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor={warehouseId} className="text-xs font-semibold text-[#5A4E45]">
+                <label
+                  htmlFor={warehouseId}
+                  className="text-xs font-semibold text-[#5A4E45]"
+                >
                   Склад призначення / Цех
                 </label>
-                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+                <span className="text-[10px] text-[#8B7D72]">
+                  Необов'язково
+                </span>
               </div>
               <input
                 id={warehouseId}
                 type="text"
                 value={warehouse}
-                onChange={(e) => setWarehouse(e.target.value)}
+                onChange={(event) => setWarehouse(event.target.value)}
                 placeholder="Головний склад / Цех №1"
                 className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
-              <span className="text-[11px] text-[#8B7D72]">Склад первинного оприбуткування</span>
+              <span className="text-[11px] text-[#8B7D72]">
+                Склад первинного оприбуткування
+              </span>
             </div>
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor={monthlyRequirementId} className="text-xs font-semibold text-[#5A4E45]">
+                <label
+                  htmlFor={monthlyRequirementId}
+                  className="text-xs font-semibold text-[#5A4E45]"
+                >
                   Орієнтовна потреба на місяць
                 </label>
-                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+                <span className="text-[10px] text-[#8B7D72]">
+                  Необов'язково
+                </span>
               </div>
               <input
                 id={monthlyRequirementId}
                 type="text"
                 value={monthlyRequirement}
-                onChange={(e) => setMonthlyRequirement(e.target.value)}
+                onChange={(event) => setMonthlyRequirement(event.target.value)}
                 placeholder="напр. 500 шт"
                 className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
-              <span className="text-[11px] text-[#8B7D72]">Для планового відділу закупівель</span>
+              <span className="text-[11px] text-[#8B7D72]">
+                Для планового відділу закупівель
+              </span>
             </div>
           </div>
 
-          {/* Вхідний контроль (просто Так / Ні) та посилання на даташит */}
+          {/* Incoming control and datasheet URL */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="flex flex-col gap-1.5 sm:col-span-1">
               <div className="flex items-center justify-between">
-                <label htmlFor={needIncomingControlId} className="text-xs font-semibold text-[#5A4E45]">
+                <label
+                  htmlFor={needIncomingControlId}
+                  className="text-xs font-semibold text-[#5A4E45]"
+                >
                   Потрібен вхідний контроль
                 </label>
               </div>
               <select
                 id={needIncomingControlId}
                 value={needIncomingControl}
-                onChange={(e) => setNeedIncomingControl(e.target.value)}
+                onChange={(event) => setNeedIncomingControl(event.target.value)}
                 className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               >
                 <option value="Ні">Ні</option>
                 <option value="Так">Так</option>
               </select>
-              <span className="text-[11px] text-[#8B7D72]">Перевірка якості перед оприбуткуванням</span>
+              <span className="text-[11px] text-[#8B7D72]">
+                Перевірка якості перед оприбуткуванням
+              </span>
             </div>
 
             <div className="flex flex-col gap-1.5 sm:col-span-3">
               <div className="flex items-center justify-between">
-                <label htmlFor={specLinkId} className="text-xs font-semibold text-[#5A4E45]">
+                <label
+                  htmlFor={specLinkId}
+                  className="text-xs font-semibold text-[#5A4E45]"
+                >
                   Посилання на технічну специфікацію / паспорт (URL)
                 </label>
-                <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+                <span className="text-[10px] text-[#8B7D72]">
+                  Необов'язково
+                </span>
               </div>
               <input
                 id={specLinkId}
                 type="url"
                 value={specLink}
-                onChange={(e) => setSpecLink(e.target.value)}
+                onChange={(event) => setSpecLink(event.target.value)}
                 placeholder="https://docs.company.local/specs/item-datasheet.pdf"
                 className="text-sm font-mono text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl h-10 px-3.5 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5]"
               />
@@ -565,30 +747,36 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
             </div>
           </div>
 
-          {/* Додатковий коментар */}
+          {/* Operational notes */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <label htmlFor={commentId} className="text-xs font-semibold text-[#5A4E45]">
+              <label
+                htmlFor={commentId}
+                className="text-xs font-semibold text-[#5A4E45]"
+              >
                 Додатковий коментар / Призначення номенклатури
               </label>
-              <span className="text-[10px] text-[#8B7D72]">Необов'язково</span>
+              <span className="text-[10px] text-[#8B7D72]">
+                Необов'язково
+              </span>
             </div>
             <textarea
               id={commentId}
               rows={3}
               value={comment}
-              onChange={(e) => setComment(e.target.value)}
+              onChange={(event) => setComment(event.target.value)}
               placeholder="Вкажіть особливості обліку, умови зберігання або для якого проекту використовується..."
               className="text-sm text-[#1E1712] bg-white border border-[#DED4CA] rounded-xl p-3 outline-none focus:border-[#E8663B] focus:ring-2 focus:ring-[#FDEDE5] resize-none"
             />
             <span className="text-[11px] text-[#8B7D72]">
-              Будь-які примітки щодо аналогів, температурного режиму або комплектації
+              Будь-які примітки щодо аналогів, температурного режиму або
+              комплектації
             </span>
           </div>
         </div>
 
         {/* ========================================================= */}
-        {/* СЕКЦІЯ 3: ФАЙЛИ ТА ФОТО (ПАСПОРТ / ЗОБРАЖЕННЯ)            */}
+        {/* SECTION 3: FILE ATTACHMENTS (SPEC / PHOTO)                */}
         {/* ========================================================= */}
         <div className="bg-[#FBF8F5] border border-[#EDE5DD] rounded-2xl p-4 sm:p-5 space-y-3">
           <div className="text-xs font-bold uppercase tracking-wider text-[#5A4E45] font-mono flex items-center justify-between">
@@ -596,11 +784,13 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
               <span>📎</span>
               <span>Прикріплення документів та фото</span>
             </span>
-            <span className="text-[11px] text-[#8B7D72] font-normal">Необов'язково</span>
+            <span className="text-[11px] text-[#8B7D72] font-normal">
+              Необов'язково
+            </span>
           </div>
 
           <div className="flex flex-wrap gap-4 items-center">
-            {/* Фото */}
+            {/* Photo upload */}
             <div className="flex items-center gap-3">
               <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-[#F5EFE9] text-[#1E1712] border border-[#DED4CA] rounded-xl text-xs font-semibold transition-colors shadow-sm">
                 <span>📸 Фото позиції</span>
@@ -608,15 +798,19 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => handleFileUpload(e, setPhoto)}
+                  onChange={(event) => handleFileUpload(event, setPhoto)}
                 />
               </label>
-              <span className={`text-xs ${photo ? 'text-[#2C7A5A] font-semibold' : 'text-[#8B7D72]'}`}>
+              <span
+                className={`text-xs ${
+                  photo ? 'text-[#2C7A5A] font-semibold' : 'text-[#8B7D72]'
+                }`}
+              >
                 {photo ? `✓ ${photo.name}` : 'Не обрано'}
               </span>
             </div>
 
-            {/* Документ */}
+            {/* Document upload */}
             <div className="flex items-center gap-3">
               <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-[#F5EFE9] text-[#1E1712] border border-[#DED4CA] rounded-xl text-xs font-semibold transition-colors shadow-sm">
                 <span>📄 Паспорт / Сертифікат (PDF)</span>
@@ -624,10 +818,14 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
                   type="file"
                   accept=".pdf,.doc,.docx,.xls,.xlsx"
                   className="hidden"
-                  onChange={(e) => handleFileUpload(e, setDocFile)}
+                  onChange={(event) => handleFileUpload(event, setDocFile)}
                 />
               </label>
-              <span className={`text-xs ${docFile ? 'text-[#2C7A5A] font-semibold' : 'text-[#8B7D72]'}`}>
+              <span
+                className={`text-xs ${
+                  docFile ? 'text-[#2C7A5A] font-semibold' : 'text-[#8B7D72]'
+                }`}
+              >
                 {docFile ? `✓ ${docFile.name}` : 'Не обрано'}
               </span>
             </div>
@@ -635,7 +833,7 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* ДІЇ ТА ВІДПРАВКА                                          */}
+        {/* ACTIONS & DISPATCH                                        */}
         {/* ========================================================= */}
         <div className="flex items-center gap-3 pt-2">
           <button
@@ -673,7 +871,7 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
         </div>
       </form>
 
-      {/* МОДАЛЬНЕ ВІКНО ПІДТВЕРДЖЕННЯ */}
+      {/* Confirmation Modal */}
       {successModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
@@ -691,12 +889,17 @@ export const NomenclatureForm: React.FC<NomenclatureFormProps> = ({
               ✓
             </div>
             <div className="space-y-1.5">
-              <h3 id="success-modal-title" className="text-base font-bold text-[#1E1712]">
+              <h3
+                id="success-modal-title"
+                className="text-base font-bold text-[#1E1712]"
+              >
                 Заявку на номенклатуру створено!
               </h3>
               <p className="text-sm text-[#5A4E45] leading-relaxed">
                 Ваш запит №{' '}
-                <span className="font-mono font-bold text-[#E8663B] text-base">#{successModal.requestNum}</span>
+                <span className="font-mono font-bold text-[#E8663B] text-base">
+                  #{successModal.requestNum}
+                </span>
                 <br />
                 успішно зареєстровано в черзі опрацювання ERP.
               </p>

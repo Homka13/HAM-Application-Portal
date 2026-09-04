@@ -1,22 +1,62 @@
-import { useState, useEffect } from 'react';
+/**
+ * @file frontend/src/components/ChangeBoard.tsx
+ * @module components/ChangeBoard
+ * @description ITIL Change Management dashboard and intake board.
+ *
+ * Architectural Role:
+ * Provides a specialized administrative view for managing ITIL Change Requests.
+ * Facilitates the intake of new change proposals (Standard, Normal, Emergency),
+ * risk tier assessments (Low, Medium, High), deployment window scheduling, and
+ * lifecycle status progression (`DRAFT` -> `PENDING` -> `APPROVED` / `REJECTED` -> `IMPLEMENTED`).
+ *
+ * Inputs:
+ * - User role context (`useUser()`) enforcing RBAC guards.
+ * - HTTP API data from `GET /api/changes`.
+ *
+ * Outputs:
+ * - Interactive change management table and proposal submission form.
+ *
+ * Constraints & Assumptions:
+ * - Only users with the 'ADMIN' role can submit new change requests or trigger transitions.
+ */
+
+import { useState, useEffect, type FormEvent } from 'react';
 import { useUser } from '../context/UserContext';
 
+/**
+ * Change request entity shape displayed on the board.
+ */
 interface ChangeRequest {
+  /** Unique change request identifier. */
   id: string;
+  /** Summary title. */
   title: string;
+  /** Technical change description. */
   description: string;
+  /** Classification (STANDARD, NORMAL, EMERGENCY). */
   type: string;
+  /** Risk tier (LOW, MEDIUM, HIGH). */
   risk: string;
+  /** Current lifecycle status. */
   status: string;
+  /** ISO-8601 scheduled execution timestamp. */
   scheduledAt: string;
+  /** Initiating user or team. */
   requestedBy: string;
+  /** Authorizing manager or CAB lead. */
   approvedBy: string | null;
+  /** ISO-8601 creation timestamp. */
   createdAt: string;
+  /** Linked application tickets. */
   applications?: { id: string; applicantName: string }[];
 }
 
-const API = '/api/changes';
+/** Base API route for change requests. */
+const API_BASE_URL = '/api/changes';
 
+/**
+ * Directed status transitions permitted in the ITIL change lifecycle.
+ */
 const CHANGE_WORKFLOW: Record<string, string[]> = {
   DRAFT: ['PENDING'],
   PENDING: ['APPROVED', 'REJECTED'],
@@ -25,18 +65,21 @@ const CHANGE_WORKFLOW: Record<string, string[]> = {
   REJECTED: [],
 };
 
+/** Ukrainian display labels for change classifications. */
 const TYPE_LABELS: Record<string, string> = {
   STANDARD: 'Стандартна',
   NORMAL: 'Нормальна',
   EMERGENCY: 'Аварійна',
 };
 
+/** Ukrainian display labels for risk tiers. */
 const RISK_LABELS: Record<string, string> = {
   LOW: 'Низький',
   MEDIUM: 'Середній',
   HIGH: 'Високий',
 };
 
+/** Ukrainian display labels for lifecycle statuses. */
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Чернетка',
   PENDING: 'На розгляді',
@@ -45,6 +88,7 @@ const STATUS_LABELS: Record<string, string> = {
   REJECTED: 'Відхилено',
 };
 
+/** Tailwind CSS badge colors keyed by lifecycle status. */
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-700',
   PENDING: 'bg-yellow-100 text-yellow-800',
@@ -53,12 +97,14 @@ const STATUS_COLORS: Record<string, string> = {
   REJECTED: 'bg-red-100 text-red-800',
 };
 
+/** Tailwind CSS badge colors keyed by risk tier. */
 const RISK_COLORS: Record<string, string> = {
   LOW: 'bg-gray-100 text-gray-700',
   MEDIUM: 'bg-blue-100 text-blue-800',
   HIGH: 'bg-red-100 text-red-800',
 };
 
+/** Button action labels for state transitions. */
 const ACTION_LABELS: Record<string, string> = {
   PENDING: 'На розгляд',
   APPROVED: 'Затвердити',
@@ -66,9 +112,14 @@ const ACTION_LABELS: Record<string, string> = {
   IMPLEMENTED: 'Впровадити',
 };
 
+/**
+ * Change management dashboard component.
+ *
+ * @returns React functional component element.
+ */
 export const ChangeBoard = () => {
-  const { role } = useUser();
-  const [changes, setChanges] = useState<ChangeRequest[]>([]);
+  const { role: userRole } = useUser();
+  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState('NORMAL');
@@ -76,13 +127,16 @@ export const ChangeBoard = () => {
   const [scheduledAt, setScheduledAt] = useState('');
   const [requestedBy, setRequestedBy] = useState('');
 
-  const fetchChanges = async () => {
+  /**
+   * Fetches the current list of change requests from the backend API.
+   */
+  const fetchChanges = async (): Promise<void> => {
     try {
-      const res = await fetch(API);
-      const data = await res.json();
-      setChanges(Array.isArray(data) ? data : []);
+      const httpResponse = await fetch(API_BASE_URL);
+      const responseData = await httpResponse.json();
+      setChangeRequests(Array.isArray(responseData) ? responseData : []);
     } catch {
-      setChanges([]);
+      setChangeRequests([]);
     }
   };
 
@@ -90,15 +144,29 @@ export const ChangeBoard = () => {
     fetchChanges();
   }, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await fetch(API, {
+  /**
+   * Handles submission of a new change proposal form.
+   *
+   * @param formEvent - Form submission event.
+   */
+  const handleCreateChange = async (
+    formEvent: FormEvent,
+  ): Promise<void> => {
+    formEvent.preventDefault();
+    await fetch(API_BASE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-role': role,
+        'x-user-role': userRole,
       },
-      body: JSON.stringify({ title, description, type, risk, scheduledAt, requestedBy }),
+      body: JSON.stringify({
+        title,
+        description,
+        type,
+        risk,
+        scheduledAt,
+        requestedBy,
+      }),
     });
     setTitle('');
     setDescription('');
@@ -107,16 +175,25 @@ export const ChangeBoard = () => {
     fetchChanges();
   };
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
-    await fetch(`${API}/${id}/status`, {
+  /**
+   * Triggers a status transition for a specific change request.
+   *
+   * @param changeId - Target change request identifier.
+   * @param targetStatus - Next status in CHANGE_WORKFLOW.
+   */
+  const handleStatusTransition = async (
+    changeId: string,
+    targetStatus: string,
+  ): Promise<void> => {
+    await fetch(`${API_BASE_URL}/${changeId}/status`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-role': role,
+        'x-user-role': userRole,
       },
       body: JSON.stringify({
-        status: newStatus,
-        approvedBy: newStatus === 'APPROVED' ? 'Admin' : undefined,
+        status: targetStatus,
+        approvedBy: targetStatus === 'APPROVED' ? 'Admin' : undefined,
       }),
     });
     fetchChanges();
@@ -124,9 +201,9 @@ export const ChangeBoard = () => {
 
   return (
     <div>
-      {role === 'ADMIN' && (
+      {userRole === 'ADMIN' && (
         <form
-          onSubmit={handleCreate}
+          onSubmit={handleCreateChange}
           className="bg-white rounded-lg shadow p-6 mb-8 space-y-4"
         >
           <h2 className="text-lg font-semibold text-gray-800">
@@ -140,7 +217,7 @@ export const ChangeBoard = () => {
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(inputEvent) => setTitle(inputEvent.target.value)}
               placeholder="Коротка назва зміни"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
@@ -154,7 +231,7 @@ export const ChangeBoard = () => {
               </label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value)}
+                onChange={(selectEvent) => setType(selectEvent.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="STANDARD">Стандартна</option>
@@ -168,7 +245,7 @@ export const ChangeBoard = () => {
               </label>
               <select
                 value={risk}
-                onChange={(e) => setRisk(e.target.value)}
+                onChange={(selectEvent) => setRisk(selectEvent.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="LOW">Низький</option>
@@ -183,7 +260,7 @@ export const ChangeBoard = () => {
               <input
                 type="datetime-local"
                 value={scheduledAt}
-                onChange={(e) => setScheduledAt(e.target.value)}
+                onChange={(dateEvent) => setScheduledAt(dateEvent.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                 required
               />
@@ -197,7 +274,7 @@ export const ChangeBoard = () => {
             <input
               type="text"
               value={requestedBy}
-              onChange={(e) => setRequestedBy(e.target.value)}
+              onChange={(inputEvent) => setRequestedBy(inputEvent.target.value)}
               placeholder="Хто запитує зміну"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               required
@@ -210,7 +287,9 @@ export const ChangeBoard = () => {
             </label>
             <textarea
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(textareaEvent) =>
+                setDescription(textareaEvent.target.value)
+              }
               placeholder="Детальний опис зміни..."
               rows={3}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg resize-none"
@@ -249,7 +328,7 @@ export const ChangeBoard = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Ініціатор
               </th>
-              {role === 'ADMIN' && (
+              {userRole === 'ADMIN' && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Дії
                 </th>
@@ -257,72 +336,81 @@ export const ChangeBoard = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {changes.map((ch) => (
-              <tr key={ch.id}>
+            {changeRequests.map((changeRequest) => (
+              <tr key={changeRequest.id}>
                 <td className="px-6 py-4 text-sm text-gray-900">
-                  <div className="font-medium">{ch.title}</div>
+                  <div className="font-medium">{changeRequest.title}</div>
                   <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">
-                    {ch.description}
+                    {changeRequest.description}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                    {TYPE_LABELS[ch.type] || ch.type}
+                    {TYPE_LABELS[changeRequest.type] || changeRequest.type}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
                     className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      RISK_COLORS[ch.risk] || 'bg-gray-100 text-gray-700'
+                      RISK_COLORS[changeRequest.risk] ||
+                      'bg-gray-100 text-gray-700'
                     }`}
                   >
-                    {RISK_LABELS[ch.risk] || ch.risk}
+                    {RISK_LABELS[changeRequest.risk] || changeRequest.risk}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
                     className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      STATUS_COLORS[ch.status] || 'bg-gray-100 text-gray-700'
+                      STATUS_COLORS[changeRequest.status] ||
+                      'bg-gray-100 text-gray-700'
                     }`}
                   >
-                    {STATUS_LABELS[ch.status] || ch.status}
+                    {STATUS_LABELS[changeRequest.status] || changeRequest.status}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(ch.scheduledAt).toLocaleDateString()}
+                  {new Date(changeRequest.scheduledAt).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {ch.requestedBy}
+                  {changeRequest.requestedBy}
                 </td>
-                {role === 'ADMIN' && (
+                {userRole === 'ADMIN' && (
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex gap-1">
-                      {CHANGE_WORKFLOW[ch.status]?.map((next) => (
-                        <button
-                          key={next}
-                          onClick={() => handleStatusChange(ch.id, next)}
-                          className={`px-2 py-1 text-xs font-medium rounded ${
-                            next === 'APPROVED'
-                              ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                              : next === 'REJECTED'
-                              ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                              : next === 'IMPLEMENTED'
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                              : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                          }`}
-                        >
-                          {ACTION_LABELS[next] || next}
-                        </button>
-                      ))}
+                      {CHANGE_WORKFLOW[changeRequest.status]?.map(
+                        (nextStatus) => (
+                          <button
+                            key={nextStatus}
+                            onClick={() =>
+                              handleStatusTransition(
+                                changeRequest.id,
+                                nextStatus,
+                              )
+                            }
+                            className={`px-2 py-1 text-xs font-medium rounded ${
+                              nextStatus === 'APPROVED'
+                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                : nextStatus === 'REJECTED'
+                                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                  : nextStatus === 'IMPLEMENTED'
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                            }`}
+                          >
+                            {ACTION_LABELS[nextStatus] || nextStatus}
+                          </button>
+                        ),
+                      )}
                     </div>
                   </td>
                 )}
               </tr>
             ))}
-            {changes.length === 0 && (
+            {changeRequests.length === 0 && (
               <tr>
                 <td
-                  colSpan={role === 'ADMIN' ? 7 : 6}
+                  colSpan={userRole === 'ADMIN' ? 7 : 6}
                   className="px-6 py-8 text-center text-sm text-gray-500"
                 >
                   Запитів на зміни ще немає.

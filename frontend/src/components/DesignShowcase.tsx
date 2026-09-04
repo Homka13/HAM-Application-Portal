@@ -1,6 +1,30 @@
+/**
+ * @file DesignShowcase.tsx
+ * @description Internal design system laboratory and token showcase component.
+ * Demonstrates brand identity tokens (palette, typography), UI button hierarchy,
+ * WSJF formula calculations, the ITIL Impact × Urgency matrix (P1–P4), 12-status
+ * progression timelines, and modal/toast feedback primitives.
+ *
+ * Requirements Addressed:
+ * - Design System Documentation: Visualizes core brand colors, warm gray
+ *   neutrals, and priority tones.
+ * - Prioritization Matrix: Demonstrates dynamic calculation of P1–P4 based on
+ *   business impact and operational urgency.
+ * - WSJF Scoring: Interactive demonstration of Cost of Delay scoring
+ *   ((BV + RR + TC) / 3 * 2).
+ * - Interactive Feedback: Modals with accessible dialog backdrops and toast
+ *   notifications.
+ */
+
 import React, { useState, useId } from 'react';
 
-export const DesignShowcase = () => {
+/**
+ * DesignShowcase renders the design library tokens, controls, and interactive
+ * calculation playgrounds.
+ *
+ * @returns {React.ReactElement} The rendered design showcase view.
+ */
+export const DesignShowcase: React.FC = () => {
   const [mascotVisible] = useState(true);
   const [showHexCodes] = useState(true);
   const [bv, setBv] = useState(4);
@@ -22,9 +46,20 @@ export const DesignShowcase = () => {
   const tcRangeId = useId();
   const modalTextareaId = useId();
 
+  // WSJF formula: average of parameters multiplied by weight factor (2.0)
   const wsjf = (((bv + risk + tc) / 3) * 2).toFixed(1);
 
-  const getPriorityFromMatrix = (i: string, u: string) => {
+  /**
+   * Resolves the ITIL priority tier (P1–P4) from Impact and Urgency levels.
+   *
+   * @param {string} impactLevel - 'high', 'mid', or 'low'.
+   * @param {string} urgencyLevel - 'high', 'mid', or 'low'.
+   * @returns {string} Priority code ('P1', 'P2', 'P3', or 'P4').
+   */
+  const getPriorityFromMatrix = (
+    impactLevel: string,
+    urgencyLevel: string
+  ): string => {
     const matrix: Record<string, string> = {
       'high-high': 'P1',
       'high-mid': 'P2',
@@ -36,9 +71,10 @@ export const DesignShowcase = () => {
       'low-mid': 'P4',
       'low-low': 'P4',
     };
-    return matrix[`${i}-${u}`] || 'P4';
+    return matrix[`${impactLevel}-${urgencyLevel}`] || 'P4';
   };
 
+  /** Background, foreground, and border hex color codes for P1–P4 badges. */
   const tones: Record<string, [string, string, string]> = {
     P1: ['#FBE8E6', '#8E1F19', '#F3CFCB'],
     P2: ['#FDF1DC', '#92580A', '#F3DFB8'],
@@ -50,8 +86,10 @@ export const DesignShowcase = () => {
     ['high', 'Високий'],
     ['mid', 'Середній'],
     ['low', 'Низький'],
-  ];
-  const urgencies = ['high', 'mid', 'low'];
+  ] as const;
+
+  const urgencies = ['high', 'mid', 'low'] as const;
+
   const priorityLabels: Record<string, string> = {
     P1: 'Критичний',
     P2: 'Високий',
@@ -59,13 +97,20 @@ export const DesignShowcase = () => {
     P4: 'Низький',
   };
 
-  const getUrgencyLabel = (u: string) => {
-    if (u === 'high') return 'Висока';
-    if (u === 'mid') return 'Середня';
+  /**
+   * Translates an urgency string into a Ukrainian localized label.
+   *
+   * @param {string} urgencyLevel - Urgency tier string.
+   * @returns {string} Localized display text.
+   */
+  const getUrgencyLabel = (urgencyLevel: string): string => {
+    if (urgencyLevel === 'high') return 'Висока';
+    if (urgencyLevel === 'mid') return 'Середня';
     return 'Низька';
   };
 
-  const stepDefs = [
+  /** Definition of workflow stages and completion flags (0 = pending, 1 = done, 2 = active). */
+  const stepDefs: [string, number][] = [
     ['Новий', 1],
     ['Підготовка ТЗ', 1],
     ['Погодження', 1],
@@ -79,31 +124,61 @@ export const DesignShowcase = () => {
     ['Закрито', 0],
   ];
 
-  const getStepCircleClass = (st: number) => {
-    if (st === 2) return 'bg-white border-2 border-[#E8663B] ring-4 ring-[#FDEDE5]';
-    if (st === 1) return 'bg-[#E8663B]';
+  /**
+   * Resolves circle classes based on step completion state.
+   *
+   * @param {number} stepState - 0 (pending), 1 (completed), 2 (current).
+   * @returns {string} Tailwind CSS class string.
+   */
+  const getStepCircleClass = (stepState: number): string => {
+    if (stepState === 2)
+      return 'bg-white border-2 border-[#E8663B] ring-4 ring-[#FDEDE5]';
+    if (stepState === 1) return 'bg-[#E8663B]';
     return 'bg-white border-2 border-[#DED4CA]';
   };
 
-  const getStepTextClass = (st: number) => {
-    if (st === 2) return 'font-bold text-[#1E1712]';
-    if (st === 1) return 'text-[#5A4E45]';
+  /**
+   * Resolves label font classes based on step completion state.
+   *
+   * @param {number} stepState - 0 (pending), 1 (completed), 2 (current).
+   * @returns {string} Tailwind CSS class string.
+   */
+  const getStepTextClass = (stepState: number): string => {
+    if (stepState === 2) return 'font-bold text-[#1E1712]';
+    if (stepState === 1) return 'text-[#5A4E45]';
     return 'text-[#8B7D72]';
   };
 
-  const getStepLeftLineBg = (index: number, st: number) => {
+  /**
+   * Computes background connector line styling leading into a node.
+   *
+   * @param {number} index - Position index of the node.
+   * @param {number} stepState - State indicator of current step.
+   * @returns {string} Tailwind class for background color.
+   */
+  const getStepLeftLineBg = (index: number, stepState: number): string => {
     if (index === 0) return 'bg-transparent';
-    if (st !== 0) return 'bg-[#F9CDB4]';
+    if (stepState !== 0) return 'bg-[#F9CDB4]';
     return 'bg-[#EDE5DD]';
   };
 
-  const getStepRightLineBg = (isLast: boolean, st: number) => {
+  /**
+   * Computes background connector line styling trailing out of a node.
+   *
+   * @param {boolean} isLast - Whether the step is the terminal node.
+   * @param {number} stepState - State indicator of current step.
+   * @returns {string} Tailwind class for background color.
+   */
+  const getStepRightLineBg = (isLast: boolean, stepState: number): string => {
     if (isLast) return 'bg-transparent';
-    if (st === 1) return 'bg-[#F9CDB4]';
+    if (stepState === 1) return 'bg-[#F9CDB4]';
     return 'bg-[#EDE5DD]';
   };
 
-  const fireToast = () => {
+  /**
+   * Triggers a temporary toast notification banner for 4 seconds.
+   */
+  const fireToast = (): void => {
     setToastOpen(true);
     setTimeout(() => setToastOpen(false), 4000);
   };
@@ -116,10 +191,13 @@ export const DesignShowcase = () => {
       <div className="flex gap-8 items-center py-6 flex-wrap">
         <div className="flex-1 min-w-[320px] flex flex-col gap-3">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1E1712] leading-tight">
-            Токени й компоненти<br />внутрішнього порталу
+            Токени й компоненти
+            <br />
+            внутрішнього порталу
           </h1>
           <p className="text-sm sm:text-base text-[#5A4E45] leading-relaxed max-w-2xl">
-            Тепла палітра носухи, компактна щільність робочого інструменту, семантика пріоритетів P1–P4 і дванадцяти статусів заявки.
+            Тепла палітра носухи, компактна щільність робочого інструменту,
+            семантика пріоритетів P1–P4 і дванадцяти статусів заявки.
           </p>
         </div>
         {mascotVisible && (
@@ -138,7 +216,7 @@ export const DesignShowcase = () => {
         )}
       </div>
 
-      {/* 01 · ПАЛІТРА */}
+      {/* 01 · PALETTE */}
       <section className="pt-8 border-t border-[#EDE5DD]">
         <div className="font-mono text-xs uppercase tracking-widest text-[#8B7D72] mb-1">
           01 · Палітра
@@ -157,15 +235,21 @@ export const DesignShowcase = () => {
             { name: 'accent-700 · hover', hex: '#C7522F' },
             { name: 'fur-700 · хутро', hex: '#6B4126' },
             { name: 'mask-900 · маска', hex: '#3E2417' },
-          ].map((c) => (
-            <div key={c.name} className="flex flex-col gap-1.5">
+          ].map((colorToken) => (
+            <div key={colorToken.name} className="flex flex-col gap-1.5">
               <div
-                className={`h-14 rounded-xl ${c.border ? 'border border-[#3E2417]/10' : ''}`}
-                style={{ backgroundColor: c.hex }}
+                className={`h-14 rounded-xl ${
+                  colorToken.border ? 'border border-[#3E2417]/10' : ''
+                }`}
+                style={{ backgroundColor: colorToken.hex }}
               />
-              <div className="text-xs font-semibold text-[#1E1712] truncate">{c.name}</div>
+              <div className="text-xs font-semibold text-[#1E1712] truncate">
+                {colorToken.name}
+              </div>
               {showHexCodes && (
-                <div className="text-[11px] font-mono text-[#8B7D72]">{c.hex}</div>
+                <div className="text-[11px] font-mono text-[#8B7D72]">
+                  {colorToken.hex}
+                </div>
               )}
             </div>
           ))}
@@ -183,15 +267,21 @@ export const DesignShowcase = () => {
             { name: 'ink-400', hex: '#8B7D72' },
             { name: 'ink-600', hex: '#5A4E45' },
             { name: 'ink-900', hex: '#1E1712' },
-          ].map((c) => (
-            <div key={c.name} className="flex flex-col gap-1.5">
+          ].map((colorToken) => (
+            <div key={colorToken.name} className="flex flex-col gap-1.5">
               <div
-                className={`h-14 rounded-xl ${c.border ? 'border border-[#3E2417]/10' : ''}`}
-                style={{ backgroundColor: c.hex }}
+                className={`h-14 rounded-xl ${
+                  colorToken.border ? 'border border-[#3E2417]/10' : ''
+                }`}
+                style={{ backgroundColor: colorToken.hex }}
               />
-              <div className="text-xs font-semibold text-[#1E1712] truncate">{c.name}</div>
+              <div className="text-xs font-semibold text-[#1E1712] truncate">
+                {colorToken.name}
+              </div>
               {showHexCodes && (
-                <div className="text-[11px] font-mono text-[#8B7D72]">{c.hex}</div>
+                <div className="text-[11px] font-mono text-[#8B7D72]">
+                  {colorToken.hex}
+                </div>
               )}
             </div>
           ))}
@@ -206,53 +296,78 @@ export const DesignShowcase = () => {
             { label: 'P2 · Високий', hex: '#D97706', textColor: '#FDF1DC' },
             { label: 'P3 · Середній', hex: '#2F7D8C', textColor: '#E4F1F3' },
             { label: 'P4 · Низький', hex: '#8B7D72', textColor: '#F1ECE7' },
-          ].map((p) => (
-            <div key={p.label} className="flex flex-col gap-1.5">
+          ].map((priorityToken) => (
+            <div key={priorityToken.label} className="flex flex-col gap-1.5">
               <div
                 className="h-14 rounded-xl flex items-end p-2 font-mono text-[11px]"
-                style={{ backgroundColor: p.hex, color: p.textColor }}
+                style={{
+                  backgroundColor: priorityToken.hex,
+                  color: priorityToken.textColor,
+                }}
               >
-                {p.hex}
+                {priorityToken.hex}
               </div>
-              <div className="text-xs font-semibold text-[#1E1712]">{p.label}</div>
+              <div className="text-xs font-semibold text-[#1E1712]">
+                {priorityToken.label}
+              </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 02 · ТИПОГРАФІКА */}
+      {/* 02 · TYPOGRAPHY */}
       <section className="pt-8 border-t border-[#EDE5DD]">
         <div className="font-mono text-xs uppercase tracking-widest text-[#8B7D72] mb-1">
           02 · Типографіка
         </div>
-        <h2 className="text-xl font-bold text-[#1E1712] mb-5">Manrope · JetBrains Mono</h2>
+        <h2 className="text-xl font-bold text-[#1E1712] mb-5">
+          Manrope · JetBrains Mono
+        </h2>
         <div className="bg-white border border-[#EDE5DD] rounded-2xl overflow-hidden divide-y divide-[#F2EBE4]">
           <div className="flex flex-col sm:flex-row gap-3 sm:items-baseline p-4 sm:px-5">
-            <div className="w-36 font-mono text-xs text-[#8B7D72]">display / 40 / 700</div>
-            <div className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1E1712]">Заявка №1042</div>
+            <div className="w-36 font-mono text-xs text-[#8B7D72]">
+              display / 40 / 700
+            </div>
+            <div className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1E1712]">
+              Заявка №1042
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 sm:items-baseline p-4 sm:px-5">
-            <div className="w-36 font-mono text-xs text-[#8B7D72]">h1 / 26 / 700</div>
-            <div className="text-2xl font-bold tracking-tight text-[#1E1712]">Черга запитів команди</div>
+            <div className="w-36 font-mono text-xs text-[#8B7D72]">
+              h1 / 26 / 700
+            </div>
+            <div className="text-2xl font-bold tracking-tight text-[#1E1712]">
+              Черга запитів команди
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 sm:items-baseline p-4 sm:px-5">
-            <div className="w-36 font-mono text-xs text-[#8B7D72]">h2 / 18 / 600</div>
-            <div className="text-lg font-semibold text-[#1E1712]">Оцінка цінності запиту</div>
+            <div className="w-36 font-mono text-xs text-[#8B7D72]">
+              h2 / 18 / 600
+            </div>
+            <div className="text-lg font-semibold text-[#1E1712]">
+              Оцінка цінності запиту
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 sm:items-baseline p-4 sm:px-5">
-            <div className="w-36 font-mono text-xs text-[#8B7D72]">body / 14 / 400</div>
+            <div className="w-36 font-mono text-xs text-[#8B7D72]">
+              body / 14 / 400
+            </div>
             <div className="text-sm text-[#1E1712] leading-relaxed max-w-xl">
               Опишіть, який звіт потрібно доробити та які саме зміни очікуєте.
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 sm:items-baseline p-4 sm:px-5">
-            <div className="w-36 font-mono text-xs text-[#8B7D72]">mono / 12 / 500</div>
-            <div className="text-xs font-mono font-medium text-[#5A4E45]">HAM-1042 · WSJF 8.4 · SLA 04:12</div>
+            <div className="w-36 font-mono text-xs text-[#8B7D72]">
+              mono / 12 / 500
+            </div>
+            <div className="text-xs font-mono font-medium text-[#5A4E45]">
+              HAM-1042 · WSJF 8.4 · SLA 04:12
+            </div>
           </div>
         </div>
       </section>
 
-      {/* 03 · ДІЇ ТА КНОПКИ */}
+      {/* 03 · ACTIONS & BUTTONS */}
       <section className="pt-8 border-t border-[#EDE5DD]">
         <div className="font-mono text-xs uppercase tracking-widest text-[#8B7D72] mb-1">
           03 · Дії
@@ -295,16 +410,21 @@ export const DesignShowcase = () => {
         </div>
       </section>
 
-      {/* 04 · ВВЕДЕННЯ ТА WSJF */}
+      {/* 04 · INPUTS & WSJF */}
       <section className="pt-8 border-t border-[#EDE5DD]">
         <div className="font-mono text-xs uppercase tracking-widest text-[#8B7D72] mb-1">
           04 · Введення
         </div>
-        <h2 className="text-xl font-bold text-[#1E1712] mb-5">Поля форми та інтерактивні слайдери</h2>
+        <h2 className="text-xl font-bold text-[#1E1712] mb-5">
+          Поля форми та інтерактивні слайдери
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 space-y-4">
             <div className="flex flex-col gap-1.5">
-              <label htmlFor={requestNameId} className="text-xs font-semibold text-[#5A4E45]">
+              <label
+                htmlFor={requestNameId}
+                className="text-xs font-semibold text-[#5A4E45]"
+              >
                 Назва запиту
               </label>
               <input
@@ -315,7 +435,10 @@ export const DesignShowcase = () => {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label htmlFor={reportUrlId} className="text-xs font-semibold text-[#5A4E45]">
+              <label
+                htmlFor={reportUrlId}
+                className="text-xs font-semibold text-[#5A4E45]"
+              >
                 Посилання на звіт
               </label>
               <input
@@ -324,10 +447,15 @@ export const DesignShowcase = () => {
                 defaultValue="https://bi.internal/reports/sales-daily"
                 className="font-mono text-xs text-[#1E1712] bg-white border border-[#E8663B] rounded-xl h-9 px-3 outline-none ring-2 ring-[#FDEDE5]"
               />
-              <div className="text-[11px] text-[#8B7D72]">Обов'язкове при підтипі «Доробка»</div>
+              <div className="text-[11px] text-[#8B7D72]">
+                Обов'язкове при підтипі «Доробка»
+              </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label htmlFor={dueDateId} className="text-xs font-semibold text-[#5A4E45]">
+              <label
+                htmlFor={dueDateId}
+                className="text-xs font-semibold text-[#5A4E45]"
+              >
                 Кінцевий термін
               </label>
               <input
@@ -336,13 +464,18 @@ export const DesignShowcase = () => {
                 placeholder="дд.мм.рррр"
                 className="text-xs text-[#1E1712] bg-white border border-[#C22B22] rounded-xl h-9 px-3 outline-none"
               />
-              <div className="text-[11px] text-[#C22B22] font-medium">Обов'язковий при Time Criticality ≥ 4</div>
+              <div className="text-[11px] text-[#C22B22] font-medium">
+                Обов'язковий при Time Criticality ≥ 4
+              </div>
             </div>
           </div>
 
           <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 space-y-4">
             <div className="flex flex-col gap-1.5">
-              <label htmlFor={serviceSelectId} className="text-xs font-semibold text-[#5A4E45]">
+              <label
+                htmlFor={serviceSelectId}
+                className="text-xs font-semibold text-[#5A4E45]"
+              >
                 Сервіс
               </label>
               <select
@@ -356,7 +489,10 @@ export const DesignShowcase = () => {
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label htmlFor={descTextareaId} className="text-xs font-semibold text-[#5A4E45]">
+              <label
+                htmlFor={descTextareaId}
+                className="text-xs font-semibold text-[#5A4E45]"
+              >
                 Опис
               </label>
               <textarea
@@ -369,11 +505,15 @@ export const DesignShowcase = () => {
           </div>
 
           <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 space-y-4">
-            <div className="text-xs font-semibold text-[#5A4E45]">Оцінка цінності · 1–5</div>
+            <div className="text-xs font-semibold text-[#5A4E45]">
+              Оцінка цінності · 1–5
+            </div>
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between text-xs">
                 <label htmlFor={bvRangeId}>Business Value</label>
-                <span className="font-mono text-[#C7522F] font-semibold">{bv}</span>
+                <span className="font-mono text-[#C7522F] font-semibold">
+                  {bv}
+                </span>
               </div>
               <input
                 id={bvRangeId}
@@ -381,14 +521,16 @@ export const DesignShowcase = () => {
                 min="1"
                 max="5"
                 value={bv}
-                onChange={(e) => setBv(+e.target.value)}
+                onChange={(event) => setBv(+event.target.value)}
                 className="w-full accent-[#E8663B]"
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between text-xs">
                 <label htmlFor={riskRangeId}>Risk / Opportunity</label>
-                <span className="font-mono text-[#C7522F] font-semibold">{risk}</span>
+                <span className="font-mono text-[#C7522F] font-semibold">
+                  {risk}
+                </span>
               </div>
               <input
                 id={riskRangeId}
@@ -396,14 +538,16 @@ export const DesignShowcase = () => {
                 min="1"
                 max="5"
                 value={risk}
-                onChange={(e) => setRisk(+e.target.value)}
+                onChange={(event) => setRisk(+event.target.value)}
                 className="w-full accent-[#E8663B]"
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between text-xs">
                 <label htmlFor={tcRangeId}>Time Criticality</label>
-                <span className="font-mono text-[#C7522F] font-semibold">{tc}</span>
+                <span className="font-mono text-[#C7522F] font-semibold">
+                  {tc}
+                </span>
               </div>
               <input
                 id={tcRangeId}
@@ -411,39 +555,51 @@ export const DesignShowcase = () => {
                 min="1"
                 max="5"
                 value={tc}
-                onChange={(e) => setTc(+e.target.value)}
+                onChange={(event) => setTc(+event.target.value)}
                 className="w-full accent-[#E8663B]"
               />
             </div>
             <div className="flex items-center justify-between p-2.5 bg-[#F5EFE9] rounded-xl">
-              <span className="text-xs text-[#5A4E45] font-semibold">WSJF Score</span>
-              <span className="font-mono text-base font-bold text-[#1E1712]">{wsjf}</span>
+              <span className="text-xs text-[#5A4E45] font-semibold">
+                WSJF Score
+              </span>
+              <span className="font-mono text-base font-bold text-[#1E1712]">
+                {wsjf}
+              </span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 05 · БЕЙДЖІ ТА МАТРИЦЯ */}
+      {/* 05 · BADGES & MATRIX */}
       <section className="pt-8 border-t border-[#EDE5DD]">
         <div className="font-mono text-xs uppercase tracking-widest text-[#8B7D72] mb-1">
           05 · Стани та матриця
         </div>
-        <h2 className="text-xl font-bold text-[#1E1712] mb-5">Бейджі пріоритету та матриця Impact × Urgency</h2>
+        <h2 className="text-xl font-bold text-[#1E1712] mb-5">
+          Бейджі пріоритету та матриця Impact × Urgency
+        </h2>
         <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 space-y-6">
           <div className="space-y-3">
-            <div className="text-xs font-semibold text-[#5A4E45]">Пріоритет P1–P4</div>
+            <div className="text-xs font-semibold text-[#5A4E45]">
+              Пріоритет P1–P4
+            </div>
             <div className="flex flex-wrap gap-2.5">
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8E1F19] bg-[#FBE8E6] border border-[#F3CFCB] rounded-full px-2.5 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#C22B22]" /> P1 · Критичний
+                <span className="w-1.5 h-1.5 rounded-full bg-[#C22B22]" /> P1 ·
+                Критичний
               </span>
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#92580A] bg-[#FDF1DC] border border-[#F3DFB8] rounded-full px-2.5 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#D97706]" /> P2 · Високий
+                <span className="w-1.5 h-1.5 rounded-full bg-[#D97706]" /> P2 ·
+                Високий
               </span>
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#235C68] bg-[#E4F1F3] border border-[#C7E1E5] rounded-full px-2.5 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#2F7D8C]" /> P3 · Середній
+                <span className="w-1.5 h-1.5 rounded-full bg-[#2F7D8C]" /> P3 ·
+                Середній
               </span>
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#6A5D53] bg-[#F1ECE7] border border-[#E1D8D0] rounded-full px-2.5 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#8B7D72]" /> P4 · Низький
+                <span className="w-1.5 h-1.5 rounded-full bg-[#8B7D72]" /> P4 ·
+                Низький
               </span>
             </div>
           </div>
@@ -455,37 +611,51 @@ export const DesignShowcase = () => {
             <div className="flex gap-6 flex-wrap items-start">
               <div className="grid grid-cols-[80px_repeat(3,84px)] gap-1.5">
                 <div />
-                <div className="text-[11px] text-[#8B7D72] text-center">Висока</div>
-                <div className="text-[11px] text-[#8B7D72] text-center">Середня</div>
-                <div className="text-[11px] text-[#8B7D72] text-center">Низька</div>
+                <div className="text-[11px] text-[#8B7D72] text-center">
+                  Висока
+                </div>
+                <div className="text-[11px] text-[#8B7D72] text-center">
+                  Середня
+                </div>
+                <div className="text-[11px] text-[#8B7D72] text-center">
+                  Низька
+                </div>
 
-                {impacts.map(([iKey, iLabel]) => (
-                  <React.Fragment key={iKey}>
+                {impacts.map(([impactKey, impactLabel]) => (
+                  <React.Fragment key={impactKey}>
                     <div className="text-[11px] text-[#8B7D72] flex items-center justify-end pr-2 font-medium">
-                      {iLabel}
+                      {impactLabel}
                     </div>
-                    {urgencies.map((uKey) => {
-                      const p = getPriorityFromMatrix(iKey, uKey);
-                      const t = tones[p];
-                      const isSelected = impact === iKey && urgency === uKey;
-                      const borderStyle = isSelected ? t[1] : t[2];
-                      const ringClass = isSelected ? 'ring-2 ring-[#E8663B] shadow-sm' : '';
+                    {urgencies.map((urgencyKey) => {
+                      const priorityCode = getPriorityFromMatrix(
+                        impactKey,
+                        urgencyKey
+                      );
+                      const priorityTone = tones[priorityCode];
+                      const isSelected =
+                        impact === impactKey && urgency === urgencyKey;
+                      const borderStyle = isSelected
+                        ? priorityTone[1]
+                        : priorityTone[2];
+                      const ringClass = isSelected
+                        ? 'ring-2 ring-[#E8663B] shadow-sm'
+                        : '';
                       return (
                         <button
-                          key={`${iKey}-${uKey}`}
+                          key={`${impactKey}-${urgencyKey}`}
                           type="button"
                           onClick={() => {
-                            setImpact(iKey);
-                            setUrgency(uKey);
+                            setImpact(impactKey);
+                            setUrgency(urgencyKey);
                           }}
                           className={`h-11 rounded-lg font-mono text-xs font-semibold flex items-center justify-center transition-all cursor-pointer ${ringClass}`}
                           style={{
-                            backgroundColor: t[0],
-                            color: t[1],
+                            backgroundColor: priorityTone[0],
+                            color: priorityTone[1],
                             border: `1px solid ${borderStyle}`,
                           }}
                         >
-                          {p}
+                          {priorityCode}
                         </button>
                       );
                     })}
@@ -498,8 +668,8 @@ export const DesignShowcase = () => {
                   Обчислено
                 </div>
                 <div className="text-xs text-[#5A4E45]">
-                  Impact: {impacts.find((i) => i[0] === impact)?.[1]} · Urgency:{' '}
-                  {getUrgencyLabel(urgency)}
+                  Impact: {impacts.find((item) => item[0] === impact)?.[1]} ·
+                  Urgency: {getUrgencyLabel(urgency)}
                 </div>
                 <div className="text-xl font-bold text-[#1E1712]">
                   {currentPriority} · {priorityLabels[currentPriority]}
@@ -510,33 +680,42 @@ export const DesignShowcase = () => {
         </div>
       </section>
 
-      {/* 07 · ТАЙМЛАЙН СТАТУСІВ */}
+      {/* 07 · STATUS TIMELINE */}
       <section className="pt-8 border-t border-[#EDE5DD]">
         <div className="font-mono text-xs uppercase tracking-widest text-[#8B7D72] mb-1">
           07 · Прогрес
         </div>
-        <h2 className="text-xl font-bold text-[#1E1712] mb-5">Таймлайн статусів</h2>
+        <h2 className="text-xl font-bold text-[#1E1712] mb-5">
+          Таймлайн статусів
+        </h2>
         <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5">
           <div className="text-xs font-semibold text-[#5A4E45] mb-4">
             Горизонтальний · гілка A / B / E (ТЗ ➔ Розробка ➔ UAT)
           </div>
           <div className="flex items-start overflow-x-auto pb-2">
-            {stepDefs.map(([label, stVal], i) => {
-              const st = Number(stVal);
-              const circleClass = getStepCircleClass(st);
-              const textClass = getStepTextClass(st);
-              const leftLineBg = getStepLeftLineBg(i, st);
-              const isLast = i === stepDefs.length - 1;
-              const rightLineBg = getStepRightLineBg(isLast, st);
+            {stepDefs.map(([label, stateValue], index) => {
+              const stepState = Number(stateValue);
+              const circleClass = getStepCircleClass(stepState);
+              const textClass = getStepTextClass(stepState);
+              const leftLineBg = getStepLeftLineBg(index, stepState);
+              const isLast = index === stepDefs.length - 1;
+              const rightLineBg = getStepRightLineBg(isLast, stepState);
 
               return (
-                <div key={label} className="flex flex-col items-center gap-2 min-w-[96px] flex-1">
+                <div
+                  key={label}
+                  className="flex flex-col items-center gap-2 min-w-[96px] flex-1"
+                >
                   <div className="flex items-center w-full">
                     <div className={`h-0.5 flex-1 ${leftLineBg}`} />
-                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${circleClass}`} />
+                    <div
+                      className={`w-3 h-3 rounded-full flex-shrink-0 ${circleClass}`}
+                    />
                     <div className={`h-0.5 flex-1 ${rightLineBg}`} />
                   </div>
-                  <div className={`text-[11px] text-center px-1 font-medium ${textClass}`}>
+                  <div
+                    className={`text-[11px] text-center px-1 font-medium ${textClass}`}
+                  >
                     {label}
                   </div>
                 </div>
@@ -546,15 +725,19 @@ export const DesignShowcase = () => {
         </div>
       </section>
 
-      {/* 08 · ЗВОРОТНИЙ ЗВ'ЯЗОК */}
+      {/* 08 · USER FEEDBACK */}
       <section className="pt-8 border-t border-[#EDE5DD]">
         <div className="font-mono text-xs uppercase tracking-widest text-[#8B7D72] mb-1">
           08 · Зворотний зв'язок
         </div>
-        <h2 className="text-xl font-bold text-[#1E1712] mb-5">Модалка, тост, інтерактив</h2>
+        <h2 className="text-xl font-bold text-[#1E1712] mb-5">
+          Модалка, тост, інтерактив
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 space-y-3">
-            <div className="text-xs font-semibold text-[#5A4E45]">Живі стани</div>
+            <div className="text-xs font-semibold text-[#5A4E45]">
+              Живі стани
+            </div>
             <div className="flex flex-wrap gap-2.5">
               <button
                 type="button"
@@ -574,19 +757,25 @@ export const DesignShowcase = () => {
           </div>
 
           <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 flex flex-col justify-between">
-            <div className="text-xs font-semibold text-[#5A4E45] mb-2">Зразок тосту</div>
+            <div className="text-xs font-semibold text-[#5A4E45] mb-2">
+              Зразок тосту
+            </div>
             <div className="flex gap-2.5 p-3 bg-white border border-[#EDE5DD] rounded-xl shadow-sm">
               <div className="w-2 h-2 rounded-full bg-[#2C7A5A] mt-1.5 flex-shrink-0" />
               <div className="flex flex-col">
-                <div className="text-xs font-semibold text-[#1E1712]">Заявку HAM-1043 створено</div>
-                <div className="text-[11px] text-[#8B7D72]">Синхронізовано з PostgreSQL</div>
+                <div className="text-xs font-semibold text-[#1E1712]">
+                  Заявку HAM-1043 створено
+                </div>
+                <div className="text-[11px] text-[#8B7D72]">
+                  Синхронізовано з PostgreSQL
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* MODAL */}
+      {/* REJECTION MODAL */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button
@@ -601,11 +790,15 @@ export const DesignShowcase = () => {
             className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 flex flex-col gap-3.5 border-0 m-0 text-left"
           >
             <div className="flex flex-col gap-1">
-              <h3 id="modal-title" className="text-base font-bold text-[#1E1712]">
+              <h3
+                id="modal-title"
+                className="text-base font-bold text-[#1E1712]"
+              >
                 Відхилити заявку?
               </h3>
               <p className="text-xs text-[#5A4E45]">
-                Автор отримає повідомлення. Коментар обов'язковий — він потрапить в аудит-журнал.
+                Автор отримає повідомлення. Коментар обов'язковий — він потрапить
+                в аудит-журнал.
               </p>
             </div>
             <label htmlFor={modalTextareaId} className="sr-only">
@@ -637,13 +830,17 @@ export const DesignShowcase = () => {
         </div>
       )}
 
-      {/* TOAST */}
+      {/* TOAST NOTIFICATION */}
       {toastOpen && (
         <div className="fixed bottom-6 right-6 z-50 flex gap-2.5 p-3.5 bg-white border border-[#EDE5DD] rounded-xl shadow-xl animate-toast">
           <div className="w-2 h-2 rounded-full bg-[#2C7A5A] mt-1.5 flex-shrink-0" />
           <div className="flex flex-col">
-            <div className="text-xs font-semibold text-[#1E1712]">Заявку HAM-1043 створено</div>
-            <div className="text-[11px] text-[#8B7D72]">Синхронізовано з PostgreSQL</div>
+            <div className="text-xs font-semibold text-[#1E1712]">
+              Заявку HAM-1043 створено
+            </div>
+            <div className="text-[11px] text-[#8B7D72]">
+              Синхронізовано з PostgreSQL
+            </div>
           </div>
         </div>
       )}

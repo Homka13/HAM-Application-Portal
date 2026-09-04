@@ -1,15 +1,56 @@
+/**
+ * @file src/lib/clickup.ts
+ * @module lib/clickup
+ * @description Bidirectional ClickUp integration with fail-closed HMAC-SHA256 verification.
+ *
+ * Architectural Role:
+ * Bridges the HAM Application Portal with external ClickUp task workspaces.
+ * Synchronizes application ticket creation into ClickUp tasks, propagates outbound
+ * portal status transitions to ClickUp, and processes inbound ClickUp webhook event
+ * notifications. Implements fail-closed cryptographic HMAC-SHA256 authentication over
+ * raw payload byte buffers, multi-lingual status mapping (Ukrainian and English),
+ * outbound echo caching (60s TTL), and rapid-fire deduplication (5s TTL) to prevent
+ * infinite update loops between the two systems.
+ *
+ * Inputs:
+ * - Application entities and status transition events from `appEvents`.
+ * - Inbound webhook JSON payloads, signature headers, and raw Buffers from Express.
+ * - Integration credentials (`CLICKUP_API_KEY`, `CLICKUP_LIST_ID`, `CLICKUP_WEBHOOK_SECRET`).
+ *
+ * Outputs:
+ * - REST calls creating/updating ClickUp tasks via ClickUp API v2.
+ * - Internal application status updates and audit logs attributed to 'ClickUp Webhook'.
+ *
+ * Constraints & Assumptions:
+ * - `generateClickUpSignature` must remain exported and signature-compatible for security tests.
+ * - Inbound webhook handling is strictly fail-closed: missing secret yields HTTP 503;
+ *   missing or invalid signatures yield HTTP 401.
+ * - Webhook-initiated updates assign `changedBy: 'ClickUp Webhook'` and `actorRole: 'SYSTEM_CLICKUP'`.
+ */
+
 import crypto from 'node:crypto';
 import { db } from '../config/db';
 import { localStore } from './storage';
 import { appEvents } from '../controllers/applicationController';
 
+/**
+ * ClickUp API credentials and integration settings.
+ */
 export interface ClickUpConfig {
+  /** Personal API token for ClickUp API v2 authentication. */
   apiKey?: string;
+  /** Destination ClickUp List identifier where tasks are created. */
   listId?: string;
+  /** Secret key used to sign and verify inbound webhook HMAC-SHA256 payloads. */
   webhookSecret?: string;
+  /** Master toggle enabling or disabling ClickUp synchronization. */
   enabled?: boolean;
 }
 
+/**
+ * Priority mapping converting portal priority strings into ClickUp numeric tiers:
+ * 1: Urgent (CRITICAL), 2: High (HIGH), 3: Normal (MEDIUM), 4: Low (LOW).
+ */
 export const PRIORITY_MAP: Record<string, number> = {
   CRITICAL: 1,
   HIGH: 2,
@@ -17,8 +58,12 @@ export const PRIORITY_MAP: Record<string, number> = {
   LOW: 4,
 };
 
+/**
+ * Translation dictionary mapping external ClickUp status labels (Ukrainian and English)
+ * to internal portal lifecycle statuses across the 12-status domain model.
+ */
 export const CLICKUP_TO_PORTAL_STATUS: Record<string, string> = {
-  // Ukrainian synonyms
+  // Ukrainian status synonyms.
   'нова': 'NEW',
   'новий': 'NEW',
   'підготовка тз': 'TZ_PREPARATION',
@@ -40,7 +85,7 @@ export const CLICKUP_TO_PORTAL_STATUS: Record<string, string> = {
   'відхилено': 'REJECTED',
   'скасовано': 'REJECTED',
 
-  // English synonyms
+  // English status synonyms.
   'new': 'NEW',
   'to do': 'NEW',
   'open': 'NEW',
@@ -69,6 +114,9 @@ export const CLICKUP_TO_PORTAL_STATUS: Record<string, string> = {
   'cancelled': 'REJECTED',
 };
 
+/**
+ * Translation dictionary mapping internal portal statuses to ClickUp task statuses.
+ */
 export const PORTAL_TO_CLICKUP_STATUS: Record<string, string> = {
   NEW: 'Open',
   TZ_PREPARATION: 'TZ Preparation',
@@ -84,6 +132,11 @@ export const PORTAL_TO_CLICKUP_STATUS: Record<string, string> = {
   REJECTED: 'Rejected',
 };
 
+/**
+ * Resolves active ClickUp configuration settings from environment variables.
+ *
+ * @returns Populated ClickUpConfig instance.
+ */
 export function getClickUpConfig(): ClickUpConfig {
   return {
     apiKey: process.env.CLICKUP_API_KEY,
@@ -93,330 +146,633 @@ export function getClickUpConfig(): ClickUpConfig {
   };
 }
 
+/**
+ * Evaluates whether ClickUp integration credentials are fully configured.
+ *
+ * @returns True if both API key and List ID are present and integration is enabled.
+ */
 export function isClickUpConfigured(): boolean {
-  const cfg = getClickUpConfig();
-  return Boolean(cfg.apiKey && cfg.listId && cfg.enabled);
+  const config = getClickUpConfig();
+  return Boolean(config.apiKey && config.listId && config.enabled);
 }
 
-export function generateClickUpSignature(payload: any, secret: string): string {
-  const data = Buffer.isBuffer(payload) ? payload : (typeof payload === 'string' ? payload : JSON.stringify(payload));
-  return crypto.createHmac('sha256', secret).update(data).digest('hex');
+/**
+ * Computes an HMAC-SHA256 signature string for an unmutated payload buffer or string.
+ *
+ * Used extensively by test suites to construct valid test authentication headers.
+ *
+ * @param payload - Raw buffer, string, or object to sign.
+ * @param secret - Shared HMAC signing secret.
+ * @returns Lowercase hexadecimal HMAC-SHA256 signature string.
+ */
+export function generateClickUpSignature(
+  payload: any,
+  secret: string,
+): string {
+  const payloadBytes = Buffer.isBuffer(payload)
+    ? payload
+    : typeof payload === 'string'
+      ? payload
+      : JSON.stringify(payload);
+  return crypto.createHmac('sha256', secret).update(payloadBytes).digest('hex');
 }
 
-export function verifyClickUpSignature(payload: any, signature?: string | null, secret?: string | null): boolean {
-  if (!signature || !secret) return false;
+/**
+ * Performs timing-safe HMAC-SHA256 verification of incoming webhook signatures.
+ *
+ * Compares raw signature buffers using `crypto.timingSafeEqual` to guard against
+ * timing side-channel analysis attacks.
+ *
+ * @param payload - Raw payload buffer or string received over the wire.
+ * @param signature - Signature hexadecimal string extracted from HTTP headers.
+ * @param secret - Configured shared webhook secret.
+ * @returns True if signature is valid and authentic, false otherwise.
+ */
+export function verifyClickUpSignature(
+  payload: any,
+  signature?: string | null,
+  secret?: string | null,
+): boolean {
+  if (!signature || !secret) {
+    return false;
+  }
+
   try {
-    const rawData = Buffer.isBuffer(payload) ? payload : (typeof payload === 'string' ? payload : JSON.stringify(payload));
-    const computed = crypto.createHmac('sha256', secret).update(rawData).digest('hex');
-    const signatureBuffer = Buffer.from(signature, 'hex');
-    const computedBuffer = Buffer.from(computed, 'hex');
-    if (signatureBuffer.length !== computedBuffer.length) return false;
-    return crypto.timingSafeEqual(signatureBuffer, computedBuffer);
+    const rawData = Buffer.isBuffer(payload)
+      ? payload
+      : typeof payload === 'string'
+        ? payload
+        : JSON.stringify(payload);
+    const expectedSignatureHex = crypto
+      .createHmac('sha256', secret)
+      .update(rawData)
+      .digest('hex');
+
+    const incomingSignatureBuffer = Buffer.from(signature, 'hex');
+    const expectedSignatureBuffer = Buffer.from(expectedSignatureHex, 'hex');
+
+    // Length check prevents timingSafeEqual from throwing an exception.
+    if (incomingSignatureBuffer.length !== expectedSignatureBuffer.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(
+      incomingSignatureBuffer,
+      expectedSignatureBuffer,
+    );
   } catch {
     return false;
   }
 }
 
-export function formatClickUpTaskPayload(app: any) {
-  const priority = PRIORITY_MAP[app.priority] ?? 3;
-  const name = `[${app.id || 'NEW'}] ${app.applicantName || 'Applicant'}: ${app.description ? app.description.slice(0, 60) : 'Заявка'}`;
+/**
+ * Formats an application entity into a structured ClickUp task payload.
+ *
+ * Constructs rich markdown task descriptions containing WSJF scores, form metadata,
+ * and JSON parameters, and sets epoch millisecond due dates.
+ *
+ * @param application - Application record.
+ * @returns Formatted task object matching ClickUp API v2 expectations.
+ */
+export function formatClickUpTaskPayload(application: any) {
+  const priorityTier = PRIORITY_MAP[application.priority] ?? 3;
+  const taskName = `[${application.id || 'NEW'}] ${
+    application.applicantName || 'Applicant'
+  }: ${
+    application.description ? application.description.slice(0, 60) : 'Заявка'
+  }`;
 
-  let description = `### Інформація про заявку\n` +
-    `- **ID**: ${app.id || 'N/A'}\n` +
-    `- **Замовник**: ${app.applicantName || 'N/A'}\n` +
-    `- **Email**: ${app.requesterEmail || 'N/A'}\n` +
-    `- **Тип**: ${app.type || 'SERVICE_REQUEST'} (Форма: ${app.formType || 'A'})\n` +
-    `- **Підтип**: ${app.subtype || 'N/A'}\n` +
-    `- **Пріоритет**: ${app.priority || 'MEDIUM'}\n` +
-    `- **WSJF**: ${app.wsjf !== undefined && app.wsjf !== null ? app.wsjf : 'N/A'}\n\n` +
-    `### Опис\n${app.description || 'Опис відсутній'}\n`;
+  let markdownDescription =
+    `### Інформація про заявку\n` +
+    `- **ID**: ${application.id || 'N/A'}\n` +
+    `- **Замовник**: ${application.applicantName || 'N/A'}\n` +
+    `- **Email**: ${application.requesterEmail || 'N/A'}\n` +
+    `- **Тип**: ${application.type || 'SERVICE_REQUEST'} (Форма: ${
+      application.formType || 'A'
+    })\n` +
+    `- **Підтип**: ${application.subtype || 'N/A'}\n` +
+    `- **Пріоритет**: ${application.priority || 'MEDIUM'}\n` +
+    `- **WSJF**: ${
+      application.wsjf !== undefined && application.wsjf !== null
+        ? application.wsjf
+        : 'N/A'
+    }\n\n` +
+    `### Опис\n${application.description || 'Опис відсутній'}\n`;
 
-  if (app.payload && typeof app.payload === 'object' && Object.keys(app.payload).length > 0) {
-    description += '\n### Параметри форми\n```json\n' + JSON.stringify(app.payload, null, 2) + '\n```\n';
+  if (
+    application.payload &&
+    typeof application.payload === 'object' &&
+    Object.keys(application.payload).length > 0
+  ) {
+    markdownDescription +=
+      '\n### Параметри форми\n```json\n' +
+      JSON.stringify(application.payload, null, 2) +
+      '\n```\n';
   }
 
-  let dueDateMs: number | null = null;
-  if (app.dueDate) {
-    dueDateMs = new Date(app.dueDate).getTime();
-  } else if (app.slaDeadline) {
-    dueDateMs = new Date(app.slaDeadline).getTime();
+  let dueDateEpochMs: number | null = null;
+  if (application.dueDate) {
+    dueDateEpochMs = new Date(application.dueDate).getTime();
+  } else if (application.slaDeadline) {
+    dueDateEpochMs = new Date(application.slaDeadline).getTime();
   }
 
   return {
-    name,
-    description,
-    priority,
-    due_date: dueDateMs,
+    name: taskName,
+    description: markdownDescription,
+    priority: priorityTier,
+    due_date: dueDateEpochMs,
     tags: [
-      app.formType ? `form-${app.formType.toLowerCase()}` : 'form-a',
-      app.type ? app.type.toLowerCase() : 'service_request',
+      application.formType
+        ? `form-${application.formType.toLowerCase()}`
+        : 'form-a',
+      application.type
+        ? application.type.toLowerCase()
+        : 'service_request',
     ],
   };
 }
 
-export function mapClickUpStatus(clickupStatus?: string | null): string | null {
-  if (!clickupStatus || typeof clickupStatus !== 'string') return null;
-  const normalized = clickupStatus.trim().toLowerCase();
-  return CLICKUP_TO_PORTAL_STATUS[normalized] || null;
+/**
+ * Translates an external ClickUp status string to internal portal status.
+ *
+ * @param clickupStatus - Raw status string received from ClickUp.
+ * @returns Standard portal status or null if unrecognized.
+ */
+export function mapClickUpStatus(
+  clickupStatus?: string | null,
+): string | null {
+  if (!clickupStatus || typeof clickupStatus !== 'string') {
+    return null;
+  }
+  const normalizedStatus = clickupStatus.trim().toLowerCase();
+  return CLICKUP_TO_PORTAL_STATUS[normalizedStatus] || null;
 }
 
-export function mapPortalStatusToClickUp(portalStatus: string): string | null {
+/**
+ * Translates an internal portal status to the corresponding ClickUp status string.
+ *
+ * @param portalStatus - Internal portal status string.
+ * @returns ClickUp task status string or null.
+ */
+export function mapPortalStatusToClickUp(
+  portalStatus: string,
+): string | null {
   return PORTAL_TO_CLICKUP_STATUS[portalStatus] || null;
 }
 
+/** Cache storing outbound status mutations with a 60-second time-to-live. */
 const outboundEchoCache = new Map<string, number>();
 
+/**
+ * Records an outbound status synchronization to prevent echo reflection loops.
+ *
+ * @param taskId - ClickUp task identifier.
+ * @param status - Target status sent to ClickUp.
+ */
 export function recordOutboundEcho(taskId: string, status: string): void {
-  const key = `${taskId}:${status.toLowerCase().trim()}`;
-  outboundEchoCache.set(key, Date.now() + 60000);
+  const cacheKey = `${taskId}:${status.toLowerCase().trim()}`;
+  outboundEchoCache.set(cacheKey, Date.now() + 60000);
 }
 
-export function isRecentOutboundEcho(taskId: string, status: string): boolean {
-  const key = `${taskId}:${status.toLowerCase().trim()}`;
-  const expiry = outboundEchoCache.get(key);
-  if (!expiry) return false;
-  if (Date.now() > expiry) {
-    outboundEchoCache.delete(key);
+/**
+ * Checks whether an incoming status change matches a recent outbound update from the portal.
+ *
+ * @param taskId - ClickUp task identifier.
+ * @param status - Inbound status reported by webhook.
+ * @returns True if the status was recently dispatched outbound from the portal.
+ */
+export function isRecentOutboundEcho(
+  taskId: string,
+  status: string,
+): boolean {
+  const cacheKey = `${taskId}:${status.toLowerCase().trim()}`;
+  const expirationTimestamp = outboundEchoCache.get(cacheKey);
+  if (!expirationTimestamp) {
+    return false;
+  }
+  if (Date.now() > expirationTimestamp) {
+    outboundEchoCache.delete(cacheKey);
     return false;
   }
   return true;
 }
 
+/** Cache recording inbound webhook event timestamps with a 5-second sliding window. */
 const recentWebhookEvents = new Map<string, number>();
 
-export function processWebhookWithDedup(taskId: string, status: string, timestamp: number = Date.now()): { duplicate: boolean } {
-  const key = `${taskId}:${status.toLowerCase().trim()}`;
-  const lastSeen = recentWebhookEvents.get(key);
-  if (lastSeen && timestamp - lastSeen < 5000) {
+/**
+ * Evaluates whether an incoming webhook event is an unneeded duplicate within 5 seconds.
+ *
+ * @param taskId - ClickUp task identifier.
+ * @param status - Target status indicated in the webhook.
+ * @param currentTimestamp - Current wall-clock timestamp (defaults to Date.now()).
+ * @returns Object with boolean `duplicate` property.
+ */
+export function processWebhookWithDedup(
+  taskId: string,
+  status: string,
+  currentTimestamp: number = Date.now(),
+): { duplicate: boolean } {
+  const cacheKey = `${taskId}:${status.toLowerCase().trim()}`;
+  const lastObservedTimestamp = recentWebhookEvents.get(cacheKey);
+
+  if (
+    lastObservedTimestamp &&
+    currentTimestamp - lastObservedTimestamp < 5000
+  ) {
     return { duplicate: true };
   }
-  recentWebhookEvents.set(key, timestamp);
+
+  recentWebhookEvents.set(cacheKey, currentTimestamp);
   return { duplicate: false };
 }
 
-export async function createClickUpTask(app: any): Promise<string | null> {
+/**
+ * Creates a linked ClickUp task for an application in the configured ClickUp List.
+ *
+ * @param application - Target application entity.
+ * @returns A Promise resolving to the ClickUp task ID or null on failure.
+ */
+export async function createClickUpTask(
+  application: any,
+): Promise<string | null> {
   const { apiKey, listId } = getClickUpConfig();
   if (!apiKey || !listId) {
     console.warn('[ClickUp] Integration unconfigured. Skipping task creation.');
     return null;
   }
 
-  const payload = formatClickUpTaskPayload(app);
-  const url = `https://api.clickup.com/api/v2/list/${listId}/task`;
+  const taskPayload = formatClickUpTaskPayload(application);
+  const taskEndpointUrl = `https://api.clickup.com/api/v2/list/${listId}/task`;
 
   try {
-    const res = await fetch(url, {
+    const apiResponse = await fetch(taskEndpointUrl, {
       method: 'POST',
       headers: {
-        'Authorization': apiKey,
+        Authorization: apiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(taskPayload),
     });
 
-    if (!res.ok) {
-      console.warn(`[ClickUp API Error] HTTP ${res.status}: ${res.statusText}`);
+    if (!apiResponse.ok) {
+      console.warn(
+        `[ClickUp API Error] HTTP ${apiResponse.status}: ${apiResponse.statusText}`,
+      );
       return null;
     }
 
-    const data: any = await res.json();
-    const taskId = data?.id || null;
+    const responseJson: any = await apiResponse.json();
+    const createdTaskId = responseJson?.id || null;
 
-    if (taskId && app.id) {
+    if (createdTaskId && application.id) {
       try {
-        await db.orm.public.Application.where({ id: app.id }).update({ clickupTaskId: taskId });
+        await db.orm.public.Application
+          .where({ id: application.id })
+          .update({ clickupTaskId: createdTaskId });
         await db.orm.public.AuditLog.create({
-          applicationId: app.id,
+          applicationId: application.id,
           field: 'CLICKUP_TASK_ID',
           oldValue: null,
-          newValue: taskId,
+          newValue: createdTaskId,
           changedBy: 'ClickUp Integration',
         });
       } catch {
-        localStore.updateApplication(app.id, { clickupTaskId: taskId });
+        localStore.updateApplication(application.id, {
+          clickupTaskId: createdTaskId,
+        });
         localStore.createAuditLog({
-          applicationId: app.id,
+          applicationId: application.id,
           field: 'CLICKUP_TASK_ID',
           oldValue: null,
-          newValue: taskId,
+          newValue: createdTaskId,
           changedBy: 'ClickUp Integration',
         });
       }
-      app.clickupTaskId = taskId;
+      application.clickupTaskId = createdTaskId;
     }
 
-    return taskId;
-  } catch (err) {
-    console.error('[ClickUp Network Error]', err);
+    return createdTaskId;
+  } catch (error) {
+    console.error('[ClickUp Network Error]', error);
     return null;
   }
 }
 
-export async function updateClickUpTaskStatus(taskId: string, portalOrClickUpStatus: string): Promise<boolean> {
+/**
+ * Updates the status of an existing ClickUp task.
+ *
+ * Records an outbound echo key prior to dispatching to suppress echo loops.
+ *
+ * @param taskId - ClickUp task identifier.
+ * @param portalOrClickUpStatus - Internal portal status or ClickUp status string.
+ * @returns A Promise resolving to true if update succeeded, false otherwise.
+ */
+export async function updateClickUpTaskStatus(
+  taskId: string,
+  portalOrClickUpStatus: string,
+): Promise<boolean> {
   const { apiKey } = getClickUpConfig();
   if (!apiKey || !taskId) {
     console.warn('[ClickUp] Missing apiKey or taskId. Skipping status update.');
     return false;
   }
 
-  const targetStatus = PORTAL_TO_CLICKUP_STATUS[portalOrClickUpStatus] || portalOrClickUpStatus;
-  const url = `https://api.clickup.com/api/v2/task/${taskId}`;
+  const targetClickUpStatus =
+    PORTAL_TO_CLICKUP_STATUS[portalOrClickUpStatus] || portalOrClickUpStatus;
+  const updateEndpointUrl = `https://api.clickup.com/api/v2/task/${taskId}`;
 
-  recordOutboundEcho(taskId, targetStatus);
+  // Record echo expectation prior to network call.
+  recordOutboundEcho(taskId, targetClickUpStatus);
 
   try {
-    const res = await fetch(url, {
+    const apiResponse = await fetch(updateEndpointUrl, {
       method: 'PUT',
       headers: {
-        'Authorization': apiKey,
+        Authorization: apiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ status: targetStatus }),
+      body: JSON.stringify({ status: targetClickUpStatus }),
     });
 
-    if (!res.ok) {
-      console.warn(`[ClickUp API Error] HTTP ${res.status}: ${res.statusText}`);
+    if (!apiResponse.ok) {
+      console.warn(
+        `[ClickUp API Error] HTTP ${apiResponse.status}: ${apiResponse.statusText}`,
+      );
       return false;
     }
 
     return true;
-  } catch (err) {
-    console.error('[ClickUp Network Error]', err);
+  } catch (error) {
+    console.error('[ClickUp Network Error]', error);
     return false;
   }
 }
 
-export async function findApplicationByClickUpTaskId(taskId: string): Promise<any | null> {
+/**
+ * Locates an application record associated with a specific ClickUp task identifier.
+ *
+ * Queries PostgreSQL with fallback to `localStore`.
+ *
+ * @param taskId - ClickUp task identifier.
+ * @returns A Promise resolving to the matched Application entity or null.
+ */
+export async function findApplicationByClickUpTaskId(
+  taskId: string,
+): Promise<any | null> {
   try {
-    const app = await db.orm.public.Application.where({ clickupTaskId: taskId }).first();
-    if (app) return app;
-  } catch {}
-  const apps = localStore.getApplications();
-  return apps.find((a) => a.clickupTaskId === taskId) || null;
+    const databaseApp = await db.orm.public.Application
+      .where({ clickupTaskId: taskId })
+      .first();
+    if (databaseApp) {
+      return databaseApp;
+    }
+  } catch {
+    // Proceed to localStore fallback if database query fails.
+  }
+  const applications = localStore.getApplications();
+  return (
+    applications.find(
+      (application) => application.clickupTaskId === taskId,
+    ) || null
+  );
 }
 
+/**
+ * Standard response contract returned by webhook processing functions.
+ */
 export interface WebhookResult {
+  /** HTTP status code suitable for the webhook acknowledgement response. */
   statusCode: number;
+  /** Whether the webhook was processed successfully. */
   success: boolean;
+  /** Optional diagnostic or outcome description. */
   message?: string;
+  /** Optional error message if verification or update failed. */
   error?: string;
+  /** The updated application record if a mutation occurred. */
   application?: any;
 }
 
+/**
+ * Processes an inbound ClickUp webhook event through fail-closed verification guards.
+ *
+ * Sequence of Execution:
+ * 1. Fail-closed secret verification: Returns 503 if secret is unconfigured.
+ * 2. Missing signature check: Returns 401 if signature header is missing.
+ * 3. Timing-safe HMAC verification: Returns 401 if signature fails comparison.
+ * 4. Payload structure validation: Ensures `task_id` is present.
+ * 5. Status mapping: Translates ClickUp status to portal 12-status equivalent.
+ * 6. Outbound echo suppression: Ignores webhooks originating from recent portal updates.
+ * 7. Entity resolution: Locates the matching Application record.
+ * 8. Idempotency guard: Returns 200 immediately if status already matches.
+ * 9. Deduplication check: Suppresses duplicate webhooks within 5 seconds.
+ * 10. Database mutation & event emission: Commits status and audit log, then emits events.
+ *
+ * @param payload - Parsed JSON webhook payload body.
+ * @param signature - Incoming HMAC signature header.
+ * @param rawBody - Unparsed raw body Buffer from Express parser.
+ * @returns A Promise resolving to the structured WebhookResult.
+ */
 export async function handleInboundClickUpWebhook(
   payload: any,
   signature?: string | null,
-  rawBody?: string | Buffer
+  rawBody?: string | Buffer,
 ): Promise<WebhookResult> {
   const { webhookSecret } = getClickUpConfig();
-  const secret = webhookSecret ? webhookSecret.trim() : '';
+  const configuredSecret = webhookSecret ? webhookSecret.trim() : '';
 
-  // 1. Signature Verification (Fail-Closed)
-  if (!secret) {
-    return { statusCode: 503, success: false, error: 'CLICKUP_WEBHOOK_SECRET is not configured' };
+  // 1. Signature Verification (Fail-Closed Security Posture).
+  if (!configuredSecret) {
+    return {
+      statusCode: 503,
+      success: false,
+      error: 'CLICKUP_WEBHOOK_SECRET is not configured',
+    };
   }
 
   if (!signature) {
-    return { statusCode: 401, success: false, error: 'Missing signature header' };
+    return {
+      statusCode: 401,
+      success: false,
+      error: 'Missing signature header',
+    };
   }
 
-  const bodyToVerify = rawBody !== undefined ? rawBody : payload;
-  const isValid = verifyClickUpSignature(bodyToVerify, signature, secret);
-  if (!isValid) {
-    return { statusCode: 401, success: false, error: 'Invalid HMAC signature' };
+  const payloadToVerify = rawBody !== undefined ? rawBody : payload;
+  const isSignatureValid = verifyClickUpSignature(
+    payloadToVerify,
+    signature,
+    configuredSecret,
+  );
+
+  if (!isSignatureValid) {
+    return {
+      statusCode: 401,
+      success: false,
+      error: 'Invalid HMAC signature',
+    };
   }
 
-  let data: any = payload;
-  if (data === undefined || data === null) {
+  let parsedPayloadData: any = payload;
+  if (parsedPayloadData === undefined || parsedPayloadData === null) {
     if (rawBody !== undefined && rawBody !== null) {
-      const rawStr = Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : String(rawBody);
+      const rawString = Buffer.isBuffer(rawBody)
+        ? rawBody.toString('utf8')
+        : String(rawBody);
       try {
-        data = JSON.parse(rawStr);
+        parsedPayloadData = JSON.parse(rawString);
       } catch {
-        return { statusCode: 400, success: false, error: 'Invalid JSON payload' };
+        return {
+          statusCode: 400,
+          success: false,
+          error: 'Invalid JSON payload',
+        };
       }
     }
-  } else if (typeof data === 'string') {
+  } else if (typeof parsedPayloadData === 'string') {
     try {
-      data = JSON.parse(data);
+      parsedPayloadData = JSON.parse(parsedPayloadData);
     } catch {
-      return { statusCode: 400, success: false, error: 'Invalid JSON payload' };
+      return {
+        statusCode: 400,
+        success: false,
+        error: 'Invalid JSON payload',
+      };
     }
-  } else if (Buffer.isBuffer(data)) {
+  } else if (Buffer.isBuffer(parsedPayloadData)) {
     try {
-      data = JSON.parse(data.toString('utf8'));
+      parsedPayloadData = JSON.parse(parsedPayloadData.toString('utf8'));
     } catch {
-      return { statusCode: 400, success: false, error: 'Invalid JSON payload' };
+      return {
+        statusCode: 400,
+        success: false,
+        error: 'Invalid JSON payload',
+      };
     }
   }
 
-  // 2. Validate payload structure
-  if (!data || typeof data !== 'object' || !data.task_id) {
-    return { statusCode: 400, success: false, error: 'Missing task_id in webhook payload' };
+  // 2. Validate payload schema structure.
+  if (
+    !parsedPayloadData ||
+    typeof parsedPayloadData !== 'object' ||
+    !parsedPayloadData.task_id
+  ) {
+    return {
+      statusCode: 400,
+      success: false,
+      error: 'Missing task_id in webhook payload',
+    };
   }
 
-  // 3. Extract status from payload or history_items
-  let clickupStatus = data.status;
-  if (!clickupStatus && Array.isArray(data.history_items)) {
-    const statusItem = data.history_items.find((item: any) => item.field === 'status');
-    if (statusItem?.after?.status) {
-      clickupStatus = statusItem.after.status;
+  // 3. Extract status from top-level property or history_items collection.
+  let reportedClickUpStatus = parsedPayloadData.status;
+  if (!reportedClickUpStatus && Array.isArray(parsedPayloadData.history_items)) {
+    const statusHistoryItem = parsedPayloadData.history_items.find(
+      (item: any) => item.field === 'status',
+    );
+    if (statusHistoryItem?.after?.status) {
+      reportedClickUpStatus = statusHistoryItem.after.status;
     }
   }
 
-  if (!clickupStatus) {
-    return { statusCode: 200, success: true, message: 'No status change in payload' };
+  if (!reportedClickUpStatus) {
+    return {
+      statusCode: 200,
+      success: true,
+      message: 'No status change in payload',
+    };
   }
 
-  // 4. Map ClickUp status to Portal status
-  const targetPortalStatus = mapClickUpStatus(clickupStatus);
+  // 4. Translate ClickUp status string into internal portal status.
+  const targetPortalStatus = mapClickUpStatus(reportedClickUpStatus);
   if (!targetPortalStatus) {
-    return { statusCode: 200, success: true, message: `Ignored unmapped ClickUp status: ${clickupStatus}` };
+    return {
+      statusCode: 200,
+      success: true,
+      message: `Ignored unmapped ClickUp status: ${reportedClickUpStatus}`,
+    };
   }
 
-  // 5. Check outbound echo
-  if (isRecentOutboundEcho(data.task_id, clickupStatus)) {
-    return { statusCode: 200, success: true, message: 'Status update originated from portal (echo ignored)' };
+  // 5. Suppress outbound echo reflection loops.
+  if (
+    isRecentOutboundEcho(
+      parsedPayloadData.task_id,
+      reportedClickUpStatus,
+    )
+  ) {
+    return {
+      statusCode: 200,
+      success: true,
+      message: 'Status update originated from portal (echo ignored)',
+    };
   }
 
-  // 6. Find target application
-  const targetApp = await findApplicationByClickUpTaskId(data.task_id);
-  if (!targetApp) {
-    return { statusCode: 404, success: false, error: `Application not found for ClickUp task ${data.task_id}` };
+  // 6. Find target application entity linked to this ClickUp task ID.
+  const targetApplication = await findApplicationByClickUpTaskId(
+    parsedPayloadData.task_id,
+  );
+  if (!targetApplication) {
+    return {
+      statusCode: 404,
+      success: false,
+      error: `Application not found for ClickUp task ${parsedPayloadData.task_id}`,
+    };
   }
 
-  // 7. Idempotency check
-  if (targetApp.status === targetPortalStatus) {
-    return { statusCode: 200, success: true, message: 'Status already up to date (idempotent no-op)' };
+  // 7. Idempotency check: If ticket already has target status, return 200 cleanly.
+  if (targetApplication.status === targetPortalStatus) {
+    return {
+      statusCode: 200,
+      success: true,
+      message: 'Status already up to date (idempotent no-op)',
+    };
   }
 
-  // 8. Deduplication check
-  const dedup = processWebhookWithDedup(data.task_id, targetPortalStatus);
-  if (dedup.duplicate) {
-    return { statusCode: 200, success: true, message: 'Duplicate webhook event suppressed' };
+  // 8. Deduplication check: Suppress identical rapid-fire delivery attempts.
+  const deduplicationResult = processWebhookWithDedup(
+    parsedPayloadData.task_id,
+    targetPortalStatus,
+  );
+  if (deduplicationResult.duplicate) {
+    return {
+      statusCode: 200,
+      success: true,
+      message: 'Duplicate webhook event suppressed',
+    };
   }
 
-  // 9. Update status in DB / localStore and emit event
+  // 9. Commit status update to database or localStore, then broadcast domain event.
   try {
-    let updatedApp: any;
+    let updatedApplicationRecord: any;
     try {
-      updatedApp = await db.transaction(async (tx) => {
-        const app = await tx.orm.public.Application.where({ id: targetApp.id }).update({ status: targetPortalStatus });
-        await tx.orm.public.AuditLog.create({
-          applicationId: targetApp.id,
-          field: 'STATUS',
-          oldValue: targetApp.status,
-          newValue: targetPortalStatus,
-          changedBy: 'ClickUp Webhook',
-        });
-        return app;
-      });
+      updatedApplicationRecord = await db.transaction(
+        async (transaction) => {
+          const applicationRecord = await transaction.orm.public.Application
+            .where({ id: targetApplication.id })
+            .update({ status: targetPortalStatus });
+
+          await transaction.orm.public.AuditLog.create({
+            applicationId: targetApplication.id,
+            field: 'STATUS',
+            oldValue: targetApplication.status,
+            newValue: targetPortalStatus,
+            changedBy: 'ClickUp Webhook',
+          });
+
+          return applicationRecord;
+        },
+      );
     } catch {
-      updatedApp = localStore.updateApplication(targetApp.id, { status: targetPortalStatus });
+      updatedApplicationRecord = localStore.updateApplication(
+        targetApplication.id,
+        { status: targetPortalStatus },
+      );
       localStore.createAuditLog({
-        applicationId: targetApp.id,
+        applicationId: targetApplication.id,
         field: 'STATUS',
-        oldValue: targetApp.status,
+        oldValue: targetApplication.status,
         newValue: targetPortalStatus,
         changedBy: 'ClickUp Webhook',
       });
@@ -424,31 +780,47 @@ export async function handleInboundClickUpWebhook(
 
     try {
       appEvents.emit('application:status_changed', {
-        app: updatedApp,
-        from: targetApp.status,
+        app: updatedApplicationRecord,
+        from: targetApplication.status,
         to: targetPortalStatus,
         actorRole: 'SYSTEM_CLICKUP',
         changedBy: 'ClickUp Webhook',
         timestamp: new Date().toISOString(),
       });
       appEvents.emit('statusTransition', {
-        app: updatedApp,
-        from: targetApp.status,
+        app: updatedApplicationRecord,
+        from: targetApplication.status,
         to: targetPortalStatus,
         actorRole: 'SYSTEM_CLICKUP',
         changedBy: 'ClickUp Webhook',
         timestamp: new Date().toISOString(),
       });
-    } catch (emitErr) {
-      console.error('[appEvents emit error]', emitErr);
+    } catch (emissionError) {
+      console.error('[appEvents emit error]', emissionError);
     }
 
-    return { statusCode: 200, success: true, application: updatedApp };
-  } catch (err: any) {
-    return { statusCode: 400, success: false, error: err?.message || 'Failed to update application status' };
+    return {
+      statusCode: 200,
+      success: true,
+      application: updatedApplicationRecord,
+    };
+  } catch (updateError: any) {
+    return {
+      statusCode: 400,
+      success: false,
+      error: updateError?.message || 'Failed to update application status',
+    };
   }
 }
 
+/**
+ * Handles outbound status change events and synchronizes them to ClickUp.
+ *
+ * Suppresses outbound dispatches when the change originated from ClickUp itself.
+ *
+ * @param event - Status transition metadata.
+ * @returns A Promise resolving when ClickUp update completes.
+ */
 export async function handleClickUpStatusChange(event: {
   app: any;
   from: string | null;
@@ -456,38 +828,51 @@ export async function handleClickUpStatusChange(event: {
   actorRole?: string;
   changedBy?: string;
 }): Promise<void> {
-  if (event.changedBy === 'ClickUp Webhook' || event.actorRole === 'SYSTEM_CLICKUP') {
+  // Loop suppression: Skip outbound sync if the status change was caused by a ClickUp webhook.
+  if (
+    event.changedBy === 'ClickUp Webhook' ||
+    event.actorRole === 'SYSTEM_CLICKUP'
+  ) {
     return;
   }
 
-  const app = event.app;
-  if (!app) return;
+  const application = event.app;
+  if (!application) {
+    return;
+  }
 
-  if (!app.clickupTaskId) {
+  // If no task exists yet in ClickUp, auto-create one upon entering IN_PROGRESS or APPROVED.
+  if (!application.clickupTaskId) {
     const isCreationTrigger =
-      event.to === 'IN_PROGRESS' ||
-      event.to === 'APPROVED';
+      event.to === 'IN_PROGRESS' || event.to === 'APPROVED';
 
     if (isCreationTrigger) {
-      await createClickUpTask(app);
+      await createClickUpTask(application);
     }
   } else {
+    // If task already exists, propagate the new status.
     const clickUpStatus = mapPortalStatusToClickUp(event.to);
     if (clickUpStatus) {
-      await updateClickUpTaskStatus(app.clickupTaskId, clickUpStatus);
+      await updateClickUpTaskStatus(application.clickupTaskId, clickUpStatus);
     }
   }
-}
+};
 
-let isInitialized = false;
+/** Guard ensuring integration listener is bound once. */
+let isClickUpInitialized = false;
 
+/**
+ * Binds outbound status transition listener to `appEvents`.
+ */
 export function initClickUpIntegration(): void {
-  if (isInitialized) return;
-  isInitialized = true;
+  if (isClickUpInitialized) {
+    return;
+  }
+  isClickUpInitialized = true;
 
-  appEvents.on('application:status_changed', (evt: any) => {
-    handleClickUpStatusChange(evt).catch((err) => {
-      console.error('[ClickUp Status Change Error]', err);
+  appEvents.on('application:status_changed', (eventPayload: any) => {
+    handleClickUpStatusChange(eventPayload).catch((error) => {
+      console.error('[ClickUp Status Change Error]', error);
     });
   });
 }

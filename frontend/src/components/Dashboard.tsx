@@ -1,12 +1,34 @@
-import { useState, useEffect, useRef } from 'react';
+/**
+ * @file Dashboard.tsx
+ * @description Executive ITSM reporting dashboard featuring real-time KPI cards
+ * and interactive D3.js vector visualizations (Bar chart for catalog volume,
+ * Donut chart for 12-status lifecycle distribution, and Area Trend chart for
+ * 7-day throughput and SLA compliance).
+ *
+ * Requirements Addressed:
+ * - ITIL Metrics: Mean Time to Resolution (MTTR), SLA compliance rate, and
+ *   Problem-to-Incident ratio.
+ * - Interactive D3 Visualizations: Custom SVG rendering with gradient fills,
+ *   cubic-bezier animations, and dynamic HTML tooltips.
+ * - Multi-Branch State Awareness: Comprehensive tracking across all 12 ITSM
+ *   statuses for Forms A through E.
+ */
+
+import React, { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
+/**
+ * Single data point for 7-day historical resolution throughput and SLA rate.
+ */
 interface TrendPoint {
   day: string;
   count: number;
   sla: number;
 }
 
+/**
+ * Aggregated ITSM operational metrics payload from the reporting API.
+ */
 interface Stats {
   mttrMinutes: number;
   slaRate: number;
@@ -18,6 +40,19 @@ interface Stats {
   trend?: TrendPoint[];
 }
 
+/**
+ * Categorical item for the 12-status lifecycle donut chart.
+ */
+interface StatusDistributionItem {
+  key: string;
+  label: string;
+  color: string;
+  count: number;
+}
+
+/**
+ * Status color and label configuration for all 12 ITSM ticket states.
+ */
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   NEW: { label: 'Новий', color: '#245A87' },
   TZ_PREPARATION: { label: 'Підготовка ТЗ', color: '#5D4483' },
@@ -33,23 +68,29 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   REJECTED: { label: 'Відхилено', color: '#8E1F19' },
 };
 
-export const Dashboard = () => {
+/**
+ * Operational Dashboard component rendering key performance indicators
+ * and D3-based analytical charts.
+ *
+ * @returns {React.ReactElement} Rendered executive dashboard.
+ */
+export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // SVG Refs
+  // SVG Chart DOM References
   const barSvgRef = useRef<SVGSVGElement>(null);
   const donutSvgRef = useRef<SVGSVGElement>(null);
   const trendSvgRef = useRef<SVGSVGElement>(null);
 
-  // Tooltip Refs
+  // Floating Tooltip DOM References
   const barTooltipRef = useRef<HTMLDivElement>(null);
   const donutTooltipRef = useRef<HTMLDivElement>(null);
   const trendTooltipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch('/api/reports/stats')
-      .then((r) => r.json())
+      .then((response) => response.json())
       .then((data) => {
         if (data && !data.error) {
           setStats(data);
@@ -59,7 +100,9 @@ export const Dashboard = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  // 1. D3 BAR CHART: Заявки за сервісами каталогу
+  // ---------------------------------------------------------------------------
+  // 1. D3 BAR CHART: Incident volume categorized by service catalog item
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!stats || !barSvgRef.current) return;
 
@@ -73,54 +116,65 @@ export const Dashboard = () => {
     const width = Math.max(280, containerWidth - margin.left - margin.right);
     const height = 240 - margin.top - margin.bottom;
 
-    const g = svg
+    const chartGroup = svg
       .attr('viewBox', `0 0 ${containerWidth} 240`)
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Gradient definition
+    // Vertical gradient definition for bar fills
     const defs = svg.append('defs');
-    const grad = defs
+    const gradient = defs
       .append('linearGradient')
       .attr('id', 'barGradient')
       .attr('x1', '0%')
       .attr('y1', '0%')
       .attr('x2', '0%')
       .attr('y2', '100%');
-    grad.append('stop').attr('offset', '0%').attr('stop-color', '#E8663B');
-    grad.append('stop').attr('offset', '100%').attr('stop-color', '#F6A54A');
+    gradient
+      .append('stop')
+      .attr('offset', '0%')
+      .attr('stop-color', '#E8663B');
+    gradient
+      .append('stop')
+      .attr('offset', '100%')
+      .attr('stop-color', '#F6A54A');
 
-    const maxCount = d3.max(data, (d) => d.count) || 5;
-    const y = d3.scaleLinear().domain([0, maxCount]).nice().range([height, 0]);
+    const maxCount = d3.max(data, (datum) => datum.count) || 5;
+    const yScale = d3
+      .scaleLinear()
+      .domain([0, maxCount])
+      .nice()
+      .range([height, 0]);
 
-    // Short names for x-axis
-    const x = d3
+    const xScale = d3
       .scaleBand()
-      .domain(data.map((d) => d.name))
+      .domain(data.map((datum) => datum.name))
       .range([0, width])
       .padding(0.35);
 
-    // Horizontal Grid
-    g.append('g')
+    // Horizontal dashed reference grid
+    chartGroup
+      .append('g')
       .attr('class', 'grid')
       .call(
         d3
-          .axisLeft(y)
+          .axisLeft(yScale)
           .ticks(4)
           .tickSize(-width)
-          .tickFormat(() => ''),
+          .tickFormat(() => '')
       )
       .selectAll('line')
       .style('stroke', '#EDE5DD')
       .style('stroke-dasharray', '3 3');
 
-    g.select('.grid .domain').remove();
+    chartGroup.select('.grid .domain').remove();
 
-    // X Axis
-    g.append('g')
+    // Rotated categorical X Axis
+    chartGroup
+      .append('g')
       .attr('transform', `translate(0,${height})`)
-      .call(d3.axisBottom(x).tickSize(0))
-      .call((ax) => ax.select('.domain').style('stroke', '#EDE5DD'))
+      .call(d3.axisBottom(xScale).tickSize(0))
+      .call((axis) => axis.select('.domain').style('stroke', '#EDE5DD'))
       .selectAll('text')
       .style('text-anchor', 'end')
       .attr('dx', '-6px')
@@ -130,44 +184,46 @@ export const Dashboard = () => {
       .style('font-size', '11px')
       .style('font-weight', '500')
       .style('fill', '#5A4E45')
-      .text((d) => {
-        const str = String(d);
+      .text((labelValue) => {
+        const str = String(labelValue);
         return str.length > 20 ? str.slice(0, 18) + '…' : str;
       });
 
-    // Y Axis
-    g.append('g')
-      .call(d3.axisLeft(y).ticks(4).tickSize(0))
-      .call((ax) => ax.select('.domain').remove())
+    // Numerical Y Axis
+    chartGroup
+      .append('g')
+      .call(d3.axisLeft(yScale).ticks(4).tickSize(0))
+      .call((axis) => axis.select('.domain').remove())
       .selectAll('text')
       .style('font-family', 'JetBrains Mono, monospace')
       .style('font-size', '10px')
       .style('fill', '#8B7D72');
 
-    // Bars
-    g.selectAll('.bar')
+    // Animated rounded bar rects
+    chartGroup
+      .selectAll('.bar')
       .data(data)
       .enter()
       .append('rect')
       .attr('class', 'bar')
-      .attr('x', (d) => x(d.name) || 0)
-      .attr('width', x.bandwidth())
+      .attr('x', (datum) => xScale(datum.name) || 0)
+      .attr('width', xScale.bandwidth())
       .attr('y', height)
       .attr('height', 0)
       .attr('fill', 'url(#barGradient)')
       .attr('rx', 6)
       .style('cursor', 'pointer')
-      .on('mouseover', function (event, d) {
+      .on('mouseover', function (event, datum) {
         d3.select(this)
           .transition()
           .duration(150)
           .attr('fill', '#C7522F')
-          .attr('transform', `translate(0, -2)`);
+          .attr('transform', 'translate(0, -2)');
         tooltip
           .style('opacity', 1)
           .html(
-            `<div class="font-bold text-xs text-[#1E1712] mb-1">${d.name}</div>` +
-              `<div class="text-[11px] font-mono text-[#E8663B] font-semibold">${d.count} заявок / інцидентів</div>`,
+            `<div class="font-bold text-xs text-[#1E1712] mb-1">${datum.name}</div>` +
+              `<div class="text-[11px] font-mono text-[#E8663B] font-semibold">${datum.count} заявок / інцидентів</div>`
           )
           .style('left', `${event.offsetX + 12}px`)
           .style('top', `${event.offsetY - 24}px`);
@@ -177,32 +233,35 @@ export const Dashboard = () => {
           .transition()
           .duration(150)
           .attr('fill', 'url(#barGradient)')
-          .attr('transform', `translate(0, 0)`);
+          .attr('transform', 'translate(0, 0)');
         tooltip.style('opacity', 0);
       })
       .transition()
       .duration(700)
       .ease(d3.easeCubicOut)
-      .attr('y', (d) => y(d.count))
-      .attr('height', (d) => Math.max(4, height - y(d.count)));
+      .attr('y', (datum) => yScale(datum.count))
+      .attr('height', (datum) => Math.max(4, height - yScale(datum.count)));
 
-    // Value Labels on top of bars
-    g.selectAll('.bar-label')
+    // Value annotations atop each bar
+    chartGroup
+      .selectAll('.bar-label')
       .data(data)
       .enter()
       .append('text')
       .attr('class', 'bar-label')
-      .attr('x', (d) => (x(d.name) || 0) + x.bandwidth() / 2)
-      .attr('y', (d) => y(d.count) - 5)
+      .attr('x', (datum) => (xScale(datum.name) || 0) + xScale.bandwidth() / 2)
+      .attr('y', (datum) => yScale(datum.count) - 5)
       .attr('text-anchor', 'middle')
       .style('font-family', 'JetBrains Mono, monospace')
       .style('font-size', '11px')
       .style('font-weight', '600')
       .style('fill', '#1E1712')
-      .text((d) => (d.count > 0 ? d.count : '0'));
+      .text((datum) => (datum.count > 0 ? datum.count : '0'));
   }, [stats]);
 
-  // 2. D3 DONUT CHART: Розподіл за 12 статусами заявки
+  // ---------------------------------------------------------------------------
+  // 2. D3 DONUT CHART: Ticket distribution across all 12 operational statuses
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!stats || !donutSvgRef.current) return;
 
@@ -211,8 +270,8 @@ export const Dashboard = () => {
     svg.selectAll('*').remove();
 
     const statusCounts = stats.byStatus || {};
-    const data = Object.entries(statusCounts)
-      .filter(([_, count]) => count > 0)
+    const filteredData: StatusDistributionItem[] = Object.entries(statusCounts)
+      .filter(([, count]) => count > 0)
       .map(([key, count]) => ({
         key,
         label: STATUS_MAP[key]?.label || key,
@@ -220,79 +279,106 @@ export const Dashboard = () => {
         count,
       }));
 
-    // Fallback if empty
-    const renderData =
-      data.length > 0
-        ? data
+    // Fallback data when no items are active yet
+    const renderData: StatusDistributionItem[] =
+      filteredData.length > 0
+        ? filteredData
         : [
             { key: 'NEW', label: 'Новий', color: '#245A87', count: 1 },
-            { key: 'IN_PROGRESS', label: 'В роботі', color: '#175C69', count: 1 },
+            {
+              key: 'IN_PROGRESS',
+              label: 'В роботі',
+              color: '#175C69',
+              count: 1,
+            },
             { key: 'RESOLVED', label: 'Вирішено', color: '#2C5F22', count: 1 },
           ];
 
-    const totalCount = data.length > 0 ? data.reduce((acc, d) => acc + d.count, 0) : 0;
+    const totalCount =
+      filteredData.length > 0
+        ? filteredData.reduce((sum, item) => sum + item.count, 0)
+        : 0;
 
     const size = Math.min(donutSvgRef.current.clientWidth || 240, 240);
     const radius = size / 2 - 16;
     const innerRadius = radius * 0.65;
 
-    const g = svg
+    const chartGroup = svg
       .attr('viewBox', `0 0 ${size} ${size}`)
       .append('g')
       .attr('transform', `translate(${size / 2},${size / 2})`);
 
     const pie = d3
-      .pie<any>()
-      .value((d) => d.count)
+      .pie<StatusDistributionItem>()
+      .value((item) => item.count)
       .sort(null)
       .padAngle(0.03);
 
-    const arc = d3.arc<any>().innerRadius(innerRadius).outerRadius(radius).cornerRadius(5);
-    const arcHover = d3.arc<any>().innerRadius(innerRadius).outerRadius(radius + 6).cornerRadius(6);
+    const arc = d3
+      .arc<d3.PieArcDatum<StatusDistributionItem>>()
+      .innerRadius(innerRadius)
+      .outerRadius(radius)
+      .cornerRadius(5);
 
-    const paths = g
+    const arcHover = d3
+      .arc<d3.PieArcDatum<StatusDistributionItem>>()
+      .innerRadius(innerRadius)
+      .outerRadius(radius + 6)
+      .cornerRadius(6);
+
+    const paths = chartGroup
       .selectAll('path')
       .data(pie(renderData))
       .enter()
       .append('path')
-      .attr('fill', (d: any) => d.data.color)
+      .attr('fill', (arcDatum) => arcDatum.data.color)
       .attr('d', arc)
-      .style('cursor', 'pointer')
-      .each(function (d) {
-        (this as any)._current = d;
-      });
+      .style('cursor', 'pointer');
 
     paths
-      .on('mouseover', function (event, d: any) {
-        d3.select(this).transition().duration(200).attr('d', arcHover as any);
-        const percent = totalCount > 0 ? ((d.data.count / totalCount) * 100).toFixed(0) : '0';
+      .on('mouseover', function (event, arcDatum) {
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr('d', arcHover as never);
+        const percent =
+          totalCount > 0
+            ? ((arcDatum.data.count / totalCount) * 100).toFixed(0)
+            : '0';
         tooltip
           .style('opacity', 1)
           .html(
-            `<div class="font-bold text-xs text-[#1E1712]">${d.data.label}</div>` +
-              `<div class="text-[11px] font-mono text-[#5A4E45]">${d.data.count} шт (${percent}%)</div>`,
+            `<div class="font-bold text-xs text-[#1E1712]">${arcDatum.data.label}</div>` +
+              `<div class="text-[11px] font-mono text-[#5A4E45]">${arcDatum.data.count} шт (${percent}%)</div>`
           )
           .style('left', `${event.offsetX + 10}px`)
           .style('top', `${event.offsetY - 25}px`);
       })
       .on('mouseout', function () {
-        d3.select(this).transition().duration(200).attr('d', arc as any);
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr('d', arc as never);
         tooltip.style('opacity', 0);
       });
 
-    // Animate donut paths
+    // Donut sweep entrance transition
     paths
       .transition()
       .duration(750)
-      .attrTween('d', function (d: any) {
-        const i = d3.interpolate({ startAngle: 0, endAngle: 0 }, d);
-        return function (t: number) {
-          return arc(i(t)) || '';
+      .attrTween('d', function (arcDatum) {
+        const interpolator = d3.interpolate(
+          { startAngle: 0, endAngle: 0 },
+          arcDatum
+        );
+        return function (time: number) {
+          return arc(interpolator(time) as d3.PieArcDatum<StatusDistributionItem>) || '';
         };
       });
 
-    // Central Metric Text
-    g.append('text')
+    // Center metric counter
+    chartGroup
+      .append('text')
       .attr('text-anchor', 'middle')
       .attr('dy', '-4px')
       .style('font-family', 'JetBrains Mono, monospace')
@@ -301,7 +387,8 @@ export const Dashboard = () => {
       .style('fill', '#1E1712')
       .text(totalCount);
 
-    g.append('text')
+    chartGroup
+      .append('text')
       .attr('text-anchor', 'middle')
       .attr('dy', '14px')
       .style('font-family', 'Manrope, sans-serif')
@@ -311,7 +398,9 @@ export const Dashboard = () => {
       .text('Всього заявок');
   }, [stats]);
 
-  // 3. D3 AREA TREND CHART: Динаміка вирішення та SLA
+  // ---------------------------------------------------------------------------
+  // 3. D3 AREA TREND CHART: Resolution dynamics and SLA compliance trend
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!stats || !trendSvgRef.current) return;
 
@@ -334,12 +423,12 @@ export const Dashboard = () => {
     const width = Math.max(280, containerWidth - margin.left - margin.right);
     const height = 180 - margin.top - margin.bottom;
 
-    const g = svg
+    const chartGroup = svg
       .attr('viewBox', `0 0 ${containerWidth} 180`)
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Gradient definition for area
+    // Gradient definition for shaded area
     const defs = svg.append('defs');
     const areaGrad = defs
       .append('linearGradient')
@@ -348,67 +437,82 @@ export const Dashboard = () => {
       .attr('y1', '0%')
       .attr('x2', '0%')
       .attr('y2', '100%');
-    areaGrad.append('stop').attr('offset', '0%').attr('stop-color', '#E8663B').attr('stop-opacity', 0.28);
-    areaGrad.append('stop').attr('offset', '100%').attr('stop-color', '#E8663B').attr('stop-opacity', 0.0);
+    areaGrad
+      .append('stop')
+      .attr('offset', '0%')
+      .attr('stop-color', '#E8663B')
+      .attr('stop-opacity', 0.28);
+    areaGrad
+      .append('stop')
+      .attr('offset', '100%')
+      .attr('stop-color', '#E8663B')
+      .attr('stop-opacity', 0.0);
 
-    const x = d3
+    const xScale = d3
       .scalePoint()
-      .domain(trendData.map((d) => d.day))
+      .domain(trendData.map((point) => point.day))
       .range([0, width]);
 
-    const maxTrend = d3.max(trendData, (d) => d.count) || 10;
-    const y = d3.scaleLinear().domain([0, maxTrend * 1.15]).nice().range([height, 0]);
+    const maxTrend = d3.max(trendData, (point) => point.count) || 10;
+    const yScale = d3
+      .scaleLinear()
+      .domain([0, maxTrend * 1.15])
+      .nice()
+      .range([height, 0]);
 
-    // Grid lines
-    g.append('g')
+    // Horizontal grid lines
+    chartGroup
+      .append('g')
       .attr('class', 'grid')
       .call(
         d3
-          .axisLeft(y)
+          .axisLeft(yScale)
           .ticks(3)
           .tickSize(-width)
-          .tickFormat(() => ''),
+          .tickFormat(() => '')
       )
       .selectAll('line')
       .style('stroke', '#EDE5DD')
       .style('stroke-dasharray', '3 3');
 
-    g.select('.grid .domain').remove();
+    chartGroup.select('.grid .domain').remove();
 
-    // Area generator
-    const area = d3
+    // Area and Line path interpolators
+    const areaGenerator = d3
       .area<TrendPoint>()
-      .x((d) => x(d.day) || 0)
+      .x((point) => xScale(point.day) || 0)
       .y0(height)
-      .y1((d) => y(d.count))
+      .y1((point) => yScale(point.count))
       .curve(d3.curveMonotoneX);
 
-    // Line generator
-    const line = d3
+    const lineGenerator = d3
       .line<TrendPoint>()
-      .x((d) => x(d.day) || 0)
-      .y((d) => y(d.count))
+      .x((point) => xScale(point.day) || 0)
+      .y((point) => yScale(point.count))
       .curve(d3.curveMonotoneX);
 
-    // Append Area
-    g.append('path')
+    // Append Area path
+    chartGroup
+      .append('path')
       .datum(trendData)
       .attr('fill', 'url(#trendAreaGrad)')
-      .attr('d', area);
+      .attr('d', areaGenerator);
 
-    // Append Line
-    g.append('path')
+    // Append Line path
+    chartGroup
+      .append('path')
       .datum(trendData)
       .attr('fill', 'none')
       .attr('stroke', '#E8663B')
       .attr('stroke-width', 2.5)
-      .attr('d', line);
+      .attr('d', lineGenerator);
 
-    // X-Axis
-    g.append('g')
+    // X Axis labels
+    chartGroup
+      .append('g')
       .attr('transform', `translate(0,${height})`)
-      .call(d3.axisBottom(x).tickSize(0))
-      .call((ax) => ax.select('.domain').style('stroke', '#EDE5DD'))
+      .call(d3.axisBottom(xScale).tickSize(0))
+      .call((axis) => axis.select('.domain').style('stroke', '#EDE5DD'))
       .selectAll('text')
       .style('font-family', 'Manrope, sans-serif')
       .style('font-size', '11px')
@@ -416,20 +520,21 @@ export const Dashboard = () => {
       .style('fill', '#5A4E45')
       .attr('dy', '10px');
 
-    // Circles for data points
-    g.selectAll('.trend-circle')
+    // Interactive circular data points with hover tooltips
+    chartGroup
+      .selectAll('.trend-circle')
       .data(trendData)
       .enter()
       .append('circle')
       .attr('class', 'trend-circle')
-      .attr('cx', (d) => x(d.day) || 0)
-      .attr('cy', (d) => y(d.count))
+      .attr('cx', (point) => xScale(point.day) || 0)
+      .attr('cy', (point) => yScale(point.count))
       .attr('r', 4.5)
       .attr('fill', '#FFFFFF')
       .attr('stroke', '#E8663B')
       .attr('stroke-width', 2)
       .style('cursor', 'pointer')
-      .on('mouseover', function (event, d) {
+      .on('mouseover', function (event, point) {
         d3.select(this)
           .transition()
           .duration(150)
@@ -439,9 +544,9 @@ export const Dashboard = () => {
         tooltip
           .style('opacity', 1)
           .html(
-            `<div class="font-bold text-xs text-[#1E1712] mb-0.5">${d.day}</div>` +
-              `<div class="text-[11px] font-mono text-[#E8663B] font-semibold">${d.count} оброблених заявок</div>` +
-              `<div class="text-[11px] font-mono text-[#2C5F22]">SLA: ${d.sla}%</div>`,
+            `<div class="font-bold text-xs text-[#1E1712] mb-0.5">${point.day}</div>` +
+              `<div class="text-[11px] font-mono text-[#E8663B] font-semibold">${point.count} оброблених заявок</div>` +
+              `<div class="text-[11px] font-mono text-[#2C5F22]">SLA: ${point.sla}%</div>`
           )
           .style('left', `${event.offsetX + 12}px`)
           .style('top', `${event.offsetY - 32}px`);
@@ -469,7 +574,7 @@ export const Dashboard = () => {
     <div className="space-y-8">
       {/* 1. TOP KPI METRICS ROW */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Dark Highlight Hero Card */}
+        {/* Hero Card: MTTR */}
         <div className="bg-[#3E2417] text-white border border-[#3E2417] rounded-2xl p-5 shadow-md flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between z-10">
             <span className="text-xs font-semibold text-[#F9CDB4] uppercase tracking-wider font-mono">
@@ -485,7 +590,6 @@ export const Dashboard = () => {
               <span>⚡</span> на 18% швидше цільового показника
             </div>
           </div>
-          {/* Subtle gradient glow in background */}
           <div className="absolute -right-4 -bottom-4 w-28 h-28 rounded-full bg-[#E8663B]/20 blur-xl pointer-events-none" />
         </div>
 
@@ -503,7 +607,9 @@ export const Dashboard = () => {
             <div className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-[#1E1712]">
               {stats?.slaRate ?? 96}%
             </div>
-            <div className="text-[11px] text-[#8B7D72] mt-1">Цільовий норматив: 95.0%</div>
+            <div className="text-[11px] text-[#8B7D72] mt-1">
+              Цільовий норматив: 95.0%
+            </div>
           </div>
         </div>
 
@@ -520,7 +626,10 @@ export const Dashboard = () => {
               {stats?.totalIncidents ?? 0}
             </div>
             <div className="text-[11px] text-[#8B7D72] mt-1">
-              Активних проблем: <span className="font-bold text-[#5A4E45]">{stats?.totalProblems ?? 0}</span>
+              Активних проблем:{' '}
+              <span className="font-bold text-[#5A4E45]">
+                {stats?.totalProblems ?? 0}
+              </span>
             </div>
           </div>
         </div>
@@ -537,19 +646,25 @@ export const Dashboard = () => {
             <div className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-[#1E1712]">
               {stats?.problemRatio ?? 0}%
             </div>
-            <div className="text-[11px] text-[#8B7D72] mt-1">ITIL превентивний аналіз корінних причин</div>
+            <div className="text-[11px] text-[#8B7D72] mt-1">
+              ITIL превентивний аналіз корінних причин
+            </div>
           </div>
         </div>
       </div>
 
       {/* 2. D3 CHARTS GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* D3 Bar Chart: Заявки за сервісами */}
+        {/* D3 Bar Chart: Service distribution */}
         <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 shadow-[0_2px_12px_rgba(62,36,23,0.03)] flex flex-col justify-between relative">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h3 className="text-sm font-bold text-[#1E1712]">Заявки за сервісами каталогу</h3>
-              <p className="text-[11px] text-[#8B7D72]">Інтерактивний розподіл навантаження (D3.js)</p>
+              <h3 className="text-sm font-bold text-[#1E1712]">
+                Заявки за сервісами каталогу
+              </h3>
+              <p className="text-[11px] text-[#8B7D72]">
+                Інтерактивний розподіл навантаження (D3.js)
+              </p>
             </div>
             <span className="text-[11px] font-mono text-[#E8663B] font-bold bg-[#FDEDE5] px-2 py-0.5 rounded-md border border-[#F9CDB4]">
               4 сервіси
@@ -565,14 +680,20 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        {/* D3 Donut Chart: Розподіл за 12 статусами */}
+        {/* D3 Donut Chart: 12-status distribution */}
         <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 shadow-[0_2px_12px_rgba(62,36,23,0.03)] flex flex-col justify-between relative">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h3 className="text-sm font-bold text-[#1E1712]">Розподіл за 12 статусами</h3>
-              <p className="text-[11px] text-[#8B7D72]">Життєвий цикл заявок та гілки A–E (D3.js)</p>
+              <h3 className="text-sm font-bold text-[#1E1712]">
+                Розподіл за 12 статусами
+              </h3>
+              <p className="text-[11px] text-[#8B7D72]">
+                Життєвий цикл заявок та гілки A–E (D3.js)
+              </p>
             </div>
-            <span className="text-[11px] font-mono text-[#5A4E45]">ITSM State Machine</span>
+            <span className="text-[11px] font-mono text-[#5A4E45]">
+              ITSM State Machine
+            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
@@ -587,14 +708,27 @@ export const Dashboard = () => {
             {/* Custom Status Legend */}
             <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1">
               {Object.entries(stats?.byStatus || {}).map(([key, count]) => {
-                const conf = STATUS_MAP[key] || { label: key, color: '#8B7D72' };
+                const statusConfig = STATUS_MAP[key] || {
+                  label: key,
+                  color: '#8B7D72',
+                };
                 return (
-                  <div key={key} className="flex items-center justify-between text-xs py-0.5">
+                  <div
+                    key={key}
+                    className="flex items-center justify-between text-xs py-0.5"
+                  >
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: conf.color }} />
-                      <span className="text-[#5A4E45] font-medium truncate max-w-[110px]">{conf.label}</span>
+                      <span
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: statusConfig.color }}
+                      />
+                      <span className="text-[#5A4E45] font-medium truncate max-w-[110px]">
+                        {statusConfig.label}
+                      </span>
                     </div>
-                    <span className="font-mono font-bold text-[#1E1712]">{count}</span>
+                    <span className="font-mono font-bold text-[#1E1712]">
+                      {count}
+                    </span>
                   </div>
                 );
               })}
@@ -603,12 +737,16 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* 3. D3 AREA TREND: Пропускна здатність & SLA */}
+      {/* 3. D3 AREA TREND: Throughput and SLA */}
       <div className="bg-white border border-[#EDE5DD] rounded-2xl p-5 shadow-[0_2px_12px_rgba(62,36,23,0.03)] relative">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h3 className="text-sm font-bold text-[#1E1712]">Динаміка обробки & Виконання SLA (7 днів)</h3>
-            <p className="text-[11px] text-[#8B7D72]">Кількість закритих заявок та відсоток дотримання дедлайну</p>
+            <h3 className="text-sm font-bold text-[#1E1712]">
+              Динаміка обробки & Виконання SLA (7 днів)
+            </h3>
+            <p className="text-[11px] text-[#8B7D72]">
+              Кількість закритих заявок та відсоток дотримання дедлайну
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1.5 text-xs text-[#5A4E45]">

@@ -1,3 +1,10 @@
+/**
+ * @file index.css
+ * @description Global stylesheet configuring Tailwind CSS layers, design tokens,
+ * font family variables (Manrope and JetBrains Mono), background colors, and
+ * toast entrance animations.
+ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

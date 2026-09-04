@@ -1,8 +1,39 @@
+/**
+ * @file src/controllers/problemController.ts
+ * @module controllers/problemController
+ * @description ITIL Problem Management controller managing root cause analysis and workarounds.
+ *
+ * Architectural Role:
+ * Handles operations related to recurring IT incidents and known errors.
+ * Enforces the ITIL Problem lifecycle state machine (`NEW` -> `RCA` ->
+ * `KNOWN_ERROR` -> `RESOLVED`), tracking root causes and permanent workarounds
+ * to prevent incident reoccurrence across the organization.
+ *
+ * Inputs:
+ * - Express `Request` containing problem payloads, status updates, and route params.
+ * - Express `Response` for transmitting JSON results.
+ *
+ * Outputs:
+ * - Emits HTTP 201 JSON on record creation, and HTTP 200 on retrieval and state mutation.
+ *
+ * Constraints & Assumptions:
+ * - Status transitions must strictly follow `PROBLEM_WORKFLOW` directed acyclic transitions.
+ * - Illegal transitions trigger a localized Ukrainian `ValidationError`.
+ * - In offline or testing environments, falls back seamlessly to `localStore`.
+ */
+
 import { Request, Response } from 'express';
 import { db } from '../config/db';
 import { NotFoundError, ValidationError } from '../errors';
 import { localStore } from '../lib/storage';
 
+/**
+ * Directed state transition graph for ITIL Problem lifecycles.
+ *
+ * Ensures problems transition through structured investigation phases:
+ * initial identification (`NEW`), root cause analysis (`RCA`), published
+ * workaround (`KNOWN_ERROR`), and final permanent closure (`RESOLVED`).
+ */
 const PROBLEM_WORKFLOW: Record<string, string[]> = {
   NEW: ['RCA'],
   RCA: ['KNOWN_ERROR'],
@@ -10,76 +41,150 @@ const PROBLEM_WORKFLOW: Record<string, string[]> = {
   RESOLVED: [],
 };
 
-export const createProblem = async (req: Request, res: Response): Promise<void> => {
-  const { title, description } = req.body;
+/**
+ * Creates a new ITIL Problem investigation ticket.
+ *
+ * @param request - Express request containing `title` and `description`.
+ * @param response - Express response returning the created Problem record with HTTP 201.
+ * @returns A Promise resolving when the HTTP response is completed.
+ */
+export const createProblem = async (
+  request: Request,
+  response: Response,
+): Promise<void> => {
+  const { title, description } = request.body;
 
   try {
-    const problem = await db.orm.public.Problem.create({ title, description });
-    res.status(201).json(problem);
+    const createdProblem = await db.orm.public.Problem.create({
+      title,
+      description,
+    });
+    response.status(201).json(createdProblem);
   } catch {
-    const problem = localStore.createProblem({ title, description });
-    res.status(201).json(problem);
+    // Fallback path for testing or disconnected database instances.
+    const createdProblem = localStore.createProblem({ title, description });
+    response.status(201).json(createdProblem);
   }
 };
 
-export const getProblems = async (_req: Request, res: Response): Promise<void> => {
+/**
+ * Retrieves all ITIL Problem records ordered by creation timestamp descending.
+ *
+ * Includes linked application tickets to provide incident correlation context.
+ *
+ * @param _request - Express request object (unused).
+ * @param response - Express response returning an array of Problem records.
+ * @returns A Promise resolving when the HTTP response is completed.
+ */
+export const getProblems = async (
+  _request: Request,
+  response: Response,
+): Promise<void> => {
   try {
     const problems = await db.orm.public.Problem
-      .orderBy((p) => p.createdAt.desc())
+      .orderBy((problem) => problem.createdAt.desc())
       .include('applications')
       .all();
-    res.status(200).json(problems);
+    response.status(200).json(problems);
   } catch {
     const problems = localStore.getProblems();
-    res.status(200).json(problems);
+    response.status(200).json(problems);
   }
 };
 
-export const updateProblemStatus = async (req: Request, res: Response): Promise<void> => {
-  const id = req.params.id as string;
-  const { status, rootCause, workaround } = req.body;
+/**
+ * Updates the lifecycle status, root cause analysis, or workaround for an ITIL Problem.
+ *
+ * Validates that the requested status change conforms to `PROBLEM_WORKFLOW`.
+ *
+ * @param request - Express request containing problem `id` parameter and update body.
+ * @param response - Express response returning the updated Problem record.
+ * @throws {NotFoundError} If the targeted problem record does not exist.
+ * @throws {ValidationError} If the requested status transition is not permitted.
+ * @returns A Promise resolving when the HTTP response is completed.
+ */
+export const updateProblemStatus = async (
+  request: Request,
+  response: Response,
+): Promise<void> => {
+  const problemId = request.params.id as string;
+  const { status, rootCause, workaround } = request.body;
 
   try {
-    const result = await db.transaction(async (tx) => {
-      const current = await tx.orm.public.Problem.where({ id }).first();
+    const updatedRecord = await db.transaction(async (transaction) => {
+      const currentProblem = await transaction.orm.public.Problem
+        .where({ id: problemId })
+        .first();
 
-      if (!current) {
+      if (!currentProblem) {
         throw new NotFoundError('Problem record not found');
       }
 
-      const allowedStatuses = PROBLEM_WORKFLOW[current.status] || [];
-      if (!allowedStatuses.includes(status)) {
-        throw new ValidationError(`Недопустимий перехід: ${current.status} → ${status}`);
+      const permittedStatuses = PROBLEM_WORKFLOW[currentProblem.status] || [];
+      if (!permittedStatuses.includes(status)) {
+        throw new ValidationError(
+          `Недопустимий перехід: ${currentProblem.status} → ${status}`,
+        );
       }
 
-      const data: { status: string; rootCause?: string; workaround?: string } = { status };
-      if (rootCause) data.rootCause = rootCause;
-      if (workaround) data.workaround = workaround;
+      const updatePayload: {
+        status: string;
+        rootCause?: string;
+        workaround?: string;
+      } = { status };
 
-      return tx.orm.public.Problem.where({ id }).update(data);
+      if (rootCause) {
+        updatePayload.rootCause = rootCause;
+      }
+      if (workaround) {
+        updatePayload.workaround = workaround;
+      }
+
+      return transaction.orm.public.Problem
+        .where({ id: problemId })
+        .update(updatePayload);
     });
 
-    res.status(200).json(result);
-  } catch (err: any) {
-    if (err instanceof NotFoundError || err instanceof ValidationError) {
-      throw err;
+    response.status(200).json(updatedRecord);
+  } catch (caughtError: any) {
+    // Re-throw domain validation and not-found exceptions directly.
+    if (
+      caughtError instanceof NotFoundError ||
+      caughtError instanceof ValidationError
+    ) {
+      throw caughtError;
     }
 
-    const current = localStore.getProblems().find((p) => p.id === id);
-    if (!current) {
+    // Fallback logic executing within localStore memory space.
+    const currentProblem = localStore
+      .getProblems()
+      .find((problem) => problem.id === problemId);
+
+    if (!currentProblem) {
       throw new NotFoundError('Problem record not found');
     }
 
-    const allowedStatuses = PROBLEM_WORKFLOW[current.status] || [];
-    if (!allowedStatuses.includes(status)) {
-      throw new ValidationError(`Недопустимий перехід: ${current.status} → ${status}`);
+    const permittedStatuses = PROBLEM_WORKFLOW[currentProblem.status] || [];
+    if (!permittedStatuses.includes(status)) {
+      throw new ValidationError(
+        `Недопустимий перехід: ${currentProblem.status} → ${status}`,
+      );
     }
 
-    const data: { status: string; rootCause?: string; workaround?: string } = { status };
-    if (rootCause) data.rootCause = rootCause;
-    if (workaround) data.workaround = workaround;
+    const updatePayload: {
+      status: string;
+      rootCause?: string;
+      workaround?: string;
+    } = { status };
 
-    const updated = localStore.updateProblem(id, data);
-    res.status(200).json(updated);
+    if (rootCause) {
+      updatePayload.rootCause = rootCause;
+    }
+    if (workaround) {
+      updatePayload.workaround = workaround;
+    }
+
+    const updatedProblem = localStore.updateProblem(problemId, updatePayload);
+    response.status(200).json(updatedProblem);
   }
 };
