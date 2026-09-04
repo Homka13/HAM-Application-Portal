@@ -1,7 +1,9 @@
-import test, { describe, it, beforeEach, afterEach } from 'node:test';
+import test, { describe, it, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import app from '../dist/index.js';
 
 function signPayload(data, secret) {
@@ -11,7 +13,50 @@ function signPayload(data, secret) {
 
 describe('ClickUp Webhook Security Regression Suite (Audit C.1 & C.2 Remediation)', () => {
   const TEST_SECRET = 'cu_sec_test_secret_key_7788';
+  const ISOLATED_DB_FILE = path.join(process.cwd(), 'data', 'local-db-webhook-test.json');
   let originalEnvSecret;
+
+  // Preserve original fs functions to prevent storage contention with concurrent tests
+  const origWriteFileSync = fs.writeFileSync;
+  const origReadFileSync = fs.readFileSync;
+  const origExistsSync = fs.existsSync;
+
+  before(() => {
+    // Intercept fs calls targeting local-db.json to redirect to an isolated test db file
+    fs.writeFileSync = function (file, data, options) {
+      if (typeof file === 'string' && file.includes('local-db.json')) {
+        return origWriteFileSync.call(fs, ISOLATED_DB_FILE, data, options);
+      }
+      return origWriteFileSync.apply(fs, arguments);
+    };
+
+    fs.readFileSync = function (file, options) {
+      if (typeof file === 'string' && file.includes('local-db.json')) {
+        if (origExistsSync.call(fs, ISOLATED_DB_FILE)) {
+          return origReadFileSync.call(fs, ISOLATED_DB_FILE, options);
+        }
+      }
+      return origReadFileSync.apply(fs, arguments);
+    };
+
+    fs.existsSync = function (file) {
+      if (typeof file === 'string' && file.includes('local-db.json')) {
+        return origExistsSync.call(fs, ISOLATED_DB_FILE) || origExistsSync.call(fs, file);
+      }
+      return origExistsSync.apply(fs, arguments);
+    };
+  });
+
+  after(() => {
+    fs.writeFileSync = origWriteFileSync;
+    fs.readFileSync = origReadFileSync;
+    fs.existsSync = origExistsSync;
+    try {
+      if (origExistsSync.call(fs, ISOLATED_DB_FILE)) {
+        fs.unlinkSync(ISOLATED_DB_FILE);
+      }
+    } catch {}
+  });
 
   beforeEach(() => {
     originalEnvSecret = process.env.CLICKUP_WEBHOOK_SECRET;
@@ -98,7 +143,7 @@ describe('ClickUp Webhook Security Regression Suite (Audit C.1 & C.2 Remediation
   describe('T3: Valid Raw HMAC & Status Synchronization (Audit C.2)', () => {
     let testTaskId;
 
-    beforeEach(async () => {
+    before(async () => {
       process.env.CLICKUP_WEBHOOK_SECRET = TEST_SECRET;
       testTaskId = 'cu-task-sec-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
       const createRes = await request(app)
@@ -110,6 +155,10 @@ describe('ClickUp Webhook Security Regression Suite (Audit C.1 & C.2 Remediation
           clickupTaskId: testTaskId,
         });
       assert.equal(createRes.status, 201);
+    });
+
+    beforeEach(() => {
+      process.env.CLICKUP_WEBHOOK_SECRET = TEST_SECRET;
     });
 
     it('synchronizes status to IN_PROGRESS with valid x-signature over raw buffer', async () => {
@@ -152,7 +201,7 @@ describe('ClickUp Webhook Security Regression Suite (Audit C.1 & C.2 Remediation
   describe('T4: Raw Body Bytes vs Re-serialized JSON Verification Guard (Audit C.2)', () => {
     let testTaskId;
 
-    beforeEach(async () => {
+    before(async () => {
       process.env.CLICKUP_WEBHOOK_SECRET = TEST_SECRET;
       testTaskId = 'cu-task-raw-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
       const createRes = await request(app)
@@ -164,6 +213,10 @@ describe('ClickUp Webhook Security Regression Suite (Audit C.1 & C.2 Remediation
           clickupTaskId: testTaskId,
         });
       assert.equal(createRes.status, 201);
+    });
+
+    beforeEach(() => {
+      process.env.CLICKUP_WEBHOOK_SECRET = TEST_SECRET;
     });
 
     it('succeeds when raw body contains custom whitespace and key ordering', async () => {
